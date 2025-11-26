@@ -704,6 +704,23 @@ function newsletterglue_ajax_save_field() {
 
 	$single_options = apply_filters( 'newsletterglue_single_options', array( 'header_image', 'header_image_pos', 'credits', 'post_types', 'disable_plugin_css' ) );
 
+	// Handle read link global settings.
+	if ( $id == 'ng_include_read_link_global' ) {
+		if ( $value == '1' || $value == 1 ) {
+			update_option( 'newsletterglue_include_read_link_global', 'yes' );
+		} else {
+			update_option( 'newsletterglue_include_read_link_global', 'no' );
+		}
+		wp_send_json( $result );
+		die();
+	}
+
+	if ( $id == 'ng_read_link_default_label' ) {
+		update_option( 'newsletterglue_read_link_default_label', sanitize_text_field( $value ) );
+		wp_send_json( $result );
+		die();
+	}
+
 	if ( in_array( $id, $single_options ) ) {
 
 		update_option( 'newsletterglue_' . $id, $value );

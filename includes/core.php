@@ -291,6 +291,11 @@ function newsletterglue_save_data( $post_id, $data ) {
 		$meta[ 'add_featured' ] = 0;
 	}
 
+	// Handle read link checkbox - if not set, it means unchecked.
+	if ( ! isset( $data[ 'ngl_include_read_link' ] ) ) {
+		$meta[ 'include_read_link' ] = 0;
+	}
+
 	if ( isset( $meta ) && ! empty( $meta ) ) {
 		if ( empty( $meta[ 'brand' ] ) ) {
 			$meta[ 'brand' ] = '';
@@ -381,6 +386,56 @@ function newsletterglue_add_title( $title, $post ) {
 	}
 
 	return '<h1 class="title">' . $title . '</h1>';
+}
+
+/**
+ * Get "Read on site" link HTML for newsletter.
+ */
+function newsletterglue_get_read_link_html( $post_id ) {
+	// Don't add link for pattern posts.
+	$post = get_post( $post_id );
+	if ( isset( $post->post_type ) && $post->post_type == 'ngl_pattern' ) {
+		return '';
+	}
+
+	// Get post meta data.
+	$data = get_post_meta( $post_id, '_newsletterglue', true );
+	$post_include = isset( $data['include_read_link'] ) ? $data['include_read_link'] : '';
+	$post_label = isset( $data['read_link_custom_label'] ) ? trim( $data['read_link_custom_label'] ) : '';
+
+	// Get global settings.
+	$global_include = get_option( 'newsletterglue_include_read_link_global', 'yes' );
+	$global_label = get_option( 'newsletterglue_read_link_default_label', __( 'Read this on the web →', 'newsletter-glue' ) );
+
+	// Determine if link should be shown.
+	// If post explicitly enables it (checked), always show.
+	// Otherwise, follow the global setting.
+	if ( $post_include === '1' || $post_include === 1 ) {
+		$show_link = true;
+	} else {
+		// Post doesn't explicitly enable it, follow global setting.
+		$show_link = ( $global_include === 'yes' );
+	}
+
+	if ( ! $show_link ) {
+		return '';
+	}
+
+	// Determine label to use.
+	$label = ! empty( $post_label ) ? $post_label : $global_label;
+	$label = sanitize_text_field( $label );
+
+	// Get post permalink.
+	$permalink = get_permalink( $post_id );
+
+	// Generate HTML.
+	$html = '<p style="margin-top: 1.5em;">';
+	$html .= '<a href="' . esc_url( $permalink ) . '" target="_blank" rel="noopener noreferrer">';
+	$html .= esc_html( $label );
+	$html .= '</a>';
+	$html .= '</p>';
+
+	return $html;
 }
 
 
@@ -490,6 +545,12 @@ function newsletterglue_generate_content( $post = '', $subject = '', $app = '' )
 	$the_post_content = do_blocks( $the_post_content );
 	$the_post_content = wpautop( $the_post_content );
 	$the_content .= $the_post_content;
+
+	// Add "Read on site" link.
+	$read_link_html = newsletterglue_get_read_link_html( $post->ID );
+	if ( ! empty( $read_link_html ) ) {
+		$the_content .= $read_link_html;
+	}
 
 	// Credits.
 	if ( get_option( 'newsletterglue_credits' ) && $post_type != 'ngl_pattern' ) {
