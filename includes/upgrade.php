@@ -16,9 +16,9 @@ class NGL_Upgrade {
 	 */
 	public function __construct() {
 
-		// Add setting tab.
-		add_filter( 'newsletterglue_settings_tab_license_save_button', '__return_false' );
-		add_action( 'newsletterglue_settings_tab_license', array( $this, 'show_settings' ), 20 );
+		// Removed: License tab hooks (tab no longer exists)
+		// add_filter( 'newsletterglue_settings_tab_license_save_button', '__return_false' );
+		// add_action( 'newsletterglue_settings_tab_license', array( $this, 'show_settings' ), 20 );
 
 		add_action( 'admin_menu', array( $this, 'admin_menu' ), 20 );
 
@@ -38,8 +38,8 @@ class NGL_Upgrade {
 	 * Link to Pro license.
 	 */
 	public function admin_menu() {
-		
-		add_submenu_page( 'newsletter-glue', __( 'Upgrade to Pro', 'newsletter-glue' ), __( 'Upgrade to Pro', 'newsletter-glue' ), 'manage_newsletterglue', 'admin.php?page=ngl-settings&tab=license' );
+		// Removed: Upgrade to Pro submenu item
+		// add_submenu_page( 'newsletter-glue', __( 'Upgrade to Pro', 'newsletter-glue' ), __( 'Upgrade to Pro', 'newsletter-glue' ), 'manage_newsletterglue', 'admin.php?page=ngl-settings&tab=license' );
 
 	}
 
@@ -220,7 +220,8 @@ class NGL_Upgrade {
 			'blocks'		=> __( 'Newsletter blocks', 'newsletter-glue' ),
 			'css' 			=> __( 'Custom CSS', 'newsletter-glue' ),
 			'additional'	=> __( 'Additional', 'newsletter-glue' ),
-			'license'		=> __( 'Pro license', 'newsletterg-lue' ),
+			// Removed: Pro license tab
+			// 'license'		=> __( 'Pro license', 'newsletterg-lue' ),
 		);
 
 		return $tabs;
