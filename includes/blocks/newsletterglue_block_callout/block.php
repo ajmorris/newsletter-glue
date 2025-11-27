@@ -10,6 +10,7 @@ if ( ! class_exists( 'NGL_Abstract_Block', false ) ) {
 class NGL_Block_Callout extends NGL_Abstract_Block {
 
 	public $id = 'newsletterglue_block_callout';
+	public $is_pro = false;
 
 	/**
 	 * Construct.
@@ -41,6 +42,61 @@ class NGL_Block_Callout extends NGL_Abstract_Block {
 	 */
 	public function get_description() {
 		return __( 'Customise the background and border of this container block to help its content stand out.', 'newsletter-glue' );
+	}
+
+	/**
+	 * Get defaults.
+	 */
+	public function get_defaults() {
+		return array(
+			'bg_color'		=> '#f9f9f9',
+			'font_color'	=> '',
+			'cta_padding'	=> 0,
+			'cta_padding2'	=> 0,
+		);
+	}
+
+	/**
+	 * Save settings.
+	 */
+	public function save_settings() {
+
+		$defaults = get_option( $this->id );
+
+		if ( ! $defaults ) {
+			$defaults = $this->get_defaults();
+		}
+
+		// Save background color
+		if ( isset( $_POST['bg_color'] ) ) {
+			$defaults['bg_color'] = sanitize_text_field( $_POST['bg_color'] );
+		}
+
+		// Save font color
+		if ( isset( $_POST['font_color'] ) ) {
+			$defaults['font_color'] = sanitize_text_field( $_POST['font_color'] );
+		}
+
+		// Save padding top/bottom
+		if ( isset( $_POST['cta_padding'] ) ) {
+			$defaults['cta_padding'] = absint( $_POST['cta_padding'] );
+			if ( $defaults['cta_padding'] > 100 ) {
+				$defaults['cta_padding'] = 100;
+			}
+		}
+
+		// Save padding left/right
+		if ( isset( $_POST['cta_padding2'] ) ) {
+			$defaults['cta_padding2'] = absint( $_POST['cta_padding2'] );
+			if ( $defaults['cta_padding2'] > 100 ) {
+				$defaults['cta_padding2'] = 100;
+			}
+		}
+
+		update_option( $this->id, $defaults );
+
+		return $defaults;
+
 	}
 
 }

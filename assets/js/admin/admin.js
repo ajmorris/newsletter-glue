@@ -1012,10 +1012,19 @@
 	$( document ).on( 'click', '.ngl-block-defaults a', function( event ) {
 		event.preventDefault();
 		var block_id = $( this ).parents( '.ngl-block' ).attr( 'data-block' );
+		var settings_element = $( '.ngl-popup-settings[data-block=' + block_id + ']' );
+		
+		// Check if settings exist for this block
+		if ( settings_element.length === 0 ) {
+			// No settings available for this block
+			alert( 'This block does not have customizable default settings.' );
+			return false;
+		}
+		
 		$( '.ngl-popup-overlay' ).addClass( 'ngl-active' );
 		$( 'body' ).addClass( 'ngl-popup-hidden' );
 		$( '.ngl-popup-overlay.ngl-active' ).find( '.ngl-popup-panel' ).empty();
-		$( '.ngl-popup-settings[data-block=' + block_id + ']' ).appendTo( $( '.ngl-popup-overlay.ngl-active' ).find( '.ngl-popup-panel' ) );
+		settings_element.appendTo( $( '.ngl-popup-overlay.ngl-active' ).find( '.ngl-popup-panel' ) );
 		$( '.ngl-popup-overlay.ngl-active' ).removeClass( 'ngl-popup-overlay-demo' );
 		$( '.ngl-popup-overlay.ngl-active' ).addClass( 'ngl-popup-overlay-settings' );
 		return false;
@@ -1052,10 +1061,22 @@
 	} );
 
 	// When block defaults are changed.
-	$( document ).on( 'change', '.ngl-popup-settings input[type=checkbox]', function( event ) {
+	$( document ).on( 'change', '.ngl-popup-settings input[type=checkbox], .ngl-popup-settings input[type=number], .ngl-popup-settings select', function( event ) {
 
 		var id  	= $( this ).parents( '.ngl-popup-settings' ).attr( 'data-block' );
-		var data 	= $( this ).parents( 'form' ).serialize() + '&action=newsletterglue_ajax_save_block&security=' + newsletterglue_params.ajaxnonce + '&id=' + id;
+		var form	= $( this ).parents( 'form' );
+		
+		// Serialize all form fields, including unchecked checkboxes
+		var data = form.serialize();
+		
+		// Add unchecked checkboxes explicitly (since serialize() skips them)
+		form.find( 'input[type=checkbox]' ).each( function() {
+			if ( ! $( this ).is( ':checked' ) ) {
+				data += '&' + encodeURIComponent( $( this ).attr( 'name' ) ) + '=';
+			}
+		});
+		
+		data += '&action=newsletterglue_ajax_save_block&security=' + newsletterglue_params.ajaxnonce + '&id=' + id;
 
 		$.ajax( {
 			type : 'post',
