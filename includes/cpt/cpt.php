@@ -880,7 +880,19 @@ class NGL_CPT {
 	public static function enqueue_block_editor_assets() {
 		global $post_type;
 
-		if ( ! in_array( $post_type, array( 'newsletterglue', 'ngl_pattern' ) ) ) {
+		// Get post types that support newsletter sending.
+		$saved_types = get_option( 'newsletterglue_post_types' );
+		$supported_types = array( 'newsletterglue', 'ngl_pattern' );
+
+		if ( ! empty( $saved_types ) ) {
+			$custom_types = explode( ',', $saved_types );
+			$supported_types = array_merge( $supported_types, $custom_types );
+		} else {
+			$core_types = apply_filters( 'newsletterglue_supported_core_types', array() );
+			$supported_types = array_merge( $supported_types, $core_types );
+		}
+
+		if ( ! in_array( $post_type, $supported_types ) ) {
 			return;
 		}
 
@@ -893,6 +905,47 @@ class NGL_CPT {
 			array( 'wp-blocks', 'wp-dom-ready', 'wp-edit-post' ),
 			time()
 		);
+
+		// Enqueue confirmation panel script.
+		$confirmation_enabled = get_option( 'newsletterglue_send_confirmation_enabled', 'no' );
+		if ( $confirmation_enabled === 'yes' ) {
+			wp_enqueue_script(
+				'ngl-confirm-send-js',
+				$js_dir . 'confirm-send.js',
+				array( 'wp-blocks', 'wp-dom-ready', 'wp-edit-post', 'wp-data', 'wp-components', 'wp-element', 'wp-plugins', 'wp-i18n', 'jquery' ),
+				time()
+			);
+
+			// Localize script with newsletter data.
+			global $post;
+			$newsletter_data = array(
+				'confirmationEnabled' => 'yes', // Use string to avoid wp_localize_script conversion issues.
+			);
+
+			if ( isset( $post->ID ) ) {
+				$settings = newsletterglue_get_data( $post->ID );
+				$app = newsletterglue_default_connection();
+
+				$newsletter_data['subject'] = isset( $settings->subject ) ? $settings->subject : '';
+				$newsletter_data['audience'] = isset( $settings->audience ) ? $settings->audience : '';
+				$newsletter_data['segment'] = isset( $settings->segment ) ? $settings->segment : '';
+				$newsletter_data['app'] = $app;
+				$newsletter_data['appName'] = $app ? newsletterglue_get_name( $app ) : '';
+
+				// Get list name.
+				if ( $app && $newsletter_data['audience'] ) {
+					include_once newsletterglue_get_path( $app ) . '/init.php';
+					$classname = 'NGL_' . ucfirst( $app );
+					$api = new $classname();
+					$lists = $api->_get_lists_compat();
+					if ( isset( $lists[ $newsletter_data['audience'] ] ) ) {
+						$newsletter_data['audienceName'] = $lists[ $newsletter_data['audience'] ];
+					}
+				}
+			}
+
+			wp_localize_script( 'ngl-confirm-send-js', 'newsletterglueConfirm', $newsletter_data );
+		}
 
 		$app = newsletterglue_default_connection();
 		if ( $app ) {
