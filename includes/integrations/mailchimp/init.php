@@ -233,11 +233,14 @@ class NGL_Mailchimp extends NGL_Abstract_Integration {
 	 */
 	public function send_newsletter( $post_id = 0, $data = array(), $test = false ) {
 
-		if ( defined( 'NGL_SEND_IN_PROGRESS' ) ) {
+		// Use a transient to prevent concurrent sends (clears automatically after 5 minutes).
+		$lock_key = 'ngl_send_in_progress_' . $post_id;
+		if ( get_transient( $lock_key ) ) {
 			return;
 		}
 
-		define( 'NGL_SEND_IN_PROGRESS', 'sending' );
+		// Set lock for 5 minutes (should be more than enough for any send operation).
+		set_transient( $lock_key, true, 5 * MINUTE_IN_SECONDS );
 
 		$post = get_post( $post_id );
 
@@ -255,6 +258,7 @@ class NGL_Mailchimp extends NGL_Abstract_Integration {
 
 		if ( $test ) {
 			if ( $this->is_invalid_email( $data[ 'test_email' ] ) ) {
+				delete_transient( $lock_key );
 				return $this->is_invalid_email( $data[ 'test_email' ] );
 			}
 		}
@@ -266,6 +270,7 @@ class NGL_Mailchimp extends NGL_Abstract_Integration {
 		// Empty content.
 		if ( $test && isset( $post->post_status ) && $post->post_status === 'auto-draft' ) {
 
+			delete_transient( $lock_key );
 			$response['fail'] = $this->nothing_to_send();
 
 			return $response;
@@ -284,6 +289,7 @@ class NGL_Mailchimp extends NGL_Abstract_Integration {
 				newsletterglue_add_campaign_data( $post_id, $subject, $this->prepare_message( $result ) );
 			}
 
+			delete_transient( $lock_key );
 			$result = array(
 				'fail'	=> __( 'Your <strong>From Email</strong> address isn&rsquo;t verified.', 'newsletter-glue' ) . '<br />' . '<a href="https://admin.mailchimp.com/account/domains/" target="_blank">' . __( 'Verify email now', 'newsletter-glue' ) . ' <i class="arrow right icon"></i></a> <a href="https://docs.newsletterglue.com/article/7-unverified-email" target="_blank">' . __( 'Learn more', 'newsletter-glue' ) . ' <i class="arrow right icon"></i></a>',
 			);
@@ -357,6 +363,7 @@ class NGL_Mailchimp extends NGL_Abstract_Integration {
 				// Let's delete the campaign.
 				$this->api->delete( 'campaigns/' . $campaign_id );
 
+				delete_transient( $lock_key );
 				return $response;
 
 			} else {
@@ -377,6 +384,7 @@ class NGL_Mailchimp extends NGL_Abstract_Integration {
 
 				newsletterglue_add_campaign_data( $post_id, $subject, $this->prepare_message( $result ), $campaign_id );
 
+				delete_transient( $lock_key );
 				return $result;
 
 			}
@@ -388,18 +396,58 @@ class NGL_Mailchimp extends NGL_Abstract_Integration {
 			if ( $test ) {
 				if ( isset( $output->status ) ) {
 					if ( $output->status == 400 ) {
-						if ( 'settings.subject_line' === $output->errors[0]->field ) {
-							$errors[ 'fail' ]   = __( 'Whoops! The subject line is empty.<br />Fill it out to send.', 'newsletter-glue' );
+						// Parse detailed error messages
+						if ( isset( $output->errors ) && is_array( $output->errors ) ) {
+							foreach ( $output->errors as $error ) {
+								if ( isset( $error->field ) && isset( $error->message ) ) {
+									if ( 'settings.subject_line' === $error->field ) {
+										$errors['fail'] = __( 'Whoops! The subject line is empty.<br />Fill it out to send.', 'newsletter-glue' );
+									} else {
+										$errors['fail'] = esc_html( $error->message );
+									}
+								}
+							}
 						}
 					}
 				}
+				delete_transient( $lock_key );
 				return $errors;
 			}
 
 			if ( ! $test ) {
-				newsletterglue_add_campaign_data( $post_id, $subject, $this->prepare_message( $result ) );
+				// Log the error with detailed information
+				$error_result = array(
+					'status' => isset( $output->status ) ? $output->status : 500,
+					'type' => 'error',
+					'message' => __( 'Failed to create campaign', 'newsletter-glue' ),
+				);
+				
+				// Add detailed error message if available
+				if ( isset( $output->detail ) ) {
+					$error_result['message'] = esc_html( $output->detail );
+				} elseif ( isset( $output->errors ) && is_array( $output->errors ) && ! empty( $output->errors ) ) {
+					$error_messages = array();
+					foreach ( $output->errors as $error ) {
+						if ( isset( $error->message ) ) {
+							$error_messages[] = $error->message;
+						} elseif ( isset( $error->field ) && isset( $error->message ) ) {
+							$error_messages[] = sprintf( '%s: %s', $error->field, $error->message );
+						}
+					}
+					if ( ! empty( $error_messages ) ) {
+						$error_result['message'] = esc_html( implode( ', ', $error_messages ) );
+					}
+				}
+				
+				// Store full error details for debugging
+				if ( isset( $output ) ) {
+					$error_result['error_details'] = json_decode( json_encode( $output ), true );
+				}
+				
+				newsletterglue_add_campaign_data( $post_id, $subject, $error_result );
 			}
 
+			delete_transient( $lock_key );
 			return $result;
 
 		}
@@ -444,37 +492,107 @@ class NGL_Mailchimp extends NGL_Abstract_Integration {
 	 */
 	public function prepare_message( $result ) {
 		$output = array();
+		
+		// Get full API response for better error details
+		$api_response = $this->api->getLastResponse();
+		$response_body = isset( $api_response['body'] ) ? json_decode( $api_response['body'], true ) : null;
 
 		if ( isset( $result['status'] ) ) {
 
 			if ( $result['status'] == 400 ) {
-				$output[ 'status' ] 	= 400;
-				$output[ 'type' ] 		= 'error';
-				$output[ 'message' ] 	= __( 'Missing subject', 'newsletter-glue' );
-				$output[ 'help' ]       = '';
+				$output['status'] = 400;
+				$output['type'] = 'error';
+				
+				// Try to get detailed error message from API response
+				if ( $response_body && isset( $response_body['detail'] ) ) {
+					$output['message'] = esc_html( $response_body['detail'] );
+				} elseif ( $response_body && isset( $response_body['errors'] ) && is_array( $response_body['errors'] ) ) {
+					// Mailchimp often provides detailed errors array
+					$error_messages = array();
+					foreach ( $response_body['errors'] as $error ) {
+						if ( isset( $error['message'] ) ) {
+							$error_messages[] = $error['message'];
+						} elseif ( isset( $error['field'] ) && isset( $error['message'] ) ) {
+							$error_messages[] = sprintf( '%s: %s', $error['field'], $error['message'] );
+						}
+					}
+					if ( ! empty( $error_messages ) ) {
+						$output['message'] = esc_html( implode( ', ', $error_messages ) );
+					} else {
+						$output['message'] = __( 'Missing subject', 'newsletter-glue' );
+					}
+				} else {
+					$output['message'] = __( 'Missing subject', 'newsletter-glue' );
+				}
+				$output['help'] = '';
+				
+				// Store full error details for debugging
+				if ( $response_body ) {
+					$output['error_details'] = $response_body;
+				}
 			}
 
 			if ( $result['status'] == 404 ) {
-				$output[ 'status' ] 	= 404;
-				$output[ 'type' ] 		= 'error';
-				$output[ 'message' ] 	= __( 'Unverified domain', 'newsletter-glue' );
-				$output[ 'notice' ]		= sprintf( __( 'Your email newsletter was not sent, because your email address is not verified. %s Or %s', 'newsletter-glue' ), 
+				$output['status'] = 404;
+				$output['type'] = 'error';
+				$output['message'] = __( 'Unverified domain', 'newsletter-glue' );
+				$output['notice'] = sprintf( __( 'Your email newsletter was not sent, because your email address is not verified. %s Or %s', 'newsletter-glue' ), 
 				'<a href="https://admin.mailchimp.com/account/domains/" target="_blank">' . __( 'Verify email now', 'newsletter-glue' ) . ' <i class="arrow right icon"></i></a>', '<a href="https://docs.newsletterglue.com/article/7-unverified-email" target="_blank">' . __( 'learn more.', 'newsletter-glue' ) . '</a>' );
-				$output[ 'help' ]       = 'https://docs.newsletterglue.com/article/7-unverified-email';
+				$output['help'] = 'https://docs.newsletterglue.com/article/7-unverified-email';
+			}
+
+			// Handle other error status codes
+			if ( $result['status'] >= 400 && $result['status'] < 500 && $result['status'] != 400 && $result['status'] != 404 ) {
+				$output['status'] = $result['status'];
+				$output['type'] = 'error';
+				
+				if ( $response_body && isset( $response_body['detail'] ) ) {
+					$output['message'] = esc_html( $response_body['detail'] );
+				} elseif ( $response_body && isset( $response_body['title'] ) ) {
+					$output['message'] = esc_html( $response_body['title'] );
+				} elseif ( $response_body && isset( $response_body['errors'] ) && is_array( $response_body['errors'] ) ) {
+					$error_messages = array();
+					foreach ( $response_body['errors'] as $error ) {
+						if ( isset( $error['message'] ) ) {
+							$error_messages[] = $error['message'];
+						}
+					}
+					if ( ! empty( $error_messages ) ) {
+						$output['message'] = esc_html( implode( ', ', $error_messages ) );
+					} else {
+						$output['message'] = sprintf( __( 'API Error: HTTP %d', 'newsletter-glue' ), $result['status'] );
+					}
+				} else {
+					$output['message'] = sprintf( __( 'API Error: HTTP %d', 'newsletter-glue' ), $result['status'] );
+				}
+				
+				// Store full error details
+				if ( $response_body ) {
+					$output['error_details'] = $response_body;
+				}
 			}
 
 			if ( $result['status'] == 'draft' ) {
-				$output[ 'status' ]		= 200;
-				$output[ 'type' ]		= 'neutral';
-				$output[ 'message' ]    = __( 'Saved as draft', 'newsletter-glue' );
+				$output['status'] = 200;
+				$output['type'] = 'neutral';
+				$output['message'] = __( 'Saved as draft', 'newsletter-glue' );
 			}
 
 		} else {
 
-			if ( $result === true ) {
-				$output[ 'status' ] 	= 200;
-				$output[ 'type'   ] 	= 'success';
-				$output[ 'message' ] 	= __( 'Sent', 'newsletter-glue' );
+			if ( $result === true || ( isset( $result['status'] ) && $result['status'] == 200 ) ) {
+				$output['status'] = 200;
+				$output['type'] = 'success';
+				$output['message'] = __( 'Sent', 'newsletter-glue' );
+			} else {
+				// Unknown response - log it as an error to be safe
+				$output['status'] = 500;
+				$output['type'] = 'error';
+				$output['message'] = __( 'Unknown response from Mailchimp API', 'newsletter-glue' );
+				
+				if ( $response_body ) {
+					$output['error_details'] = $response_body;
+				}
 			}
 
 		}

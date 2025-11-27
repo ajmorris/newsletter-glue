@@ -81,8 +81,11 @@ function newsletterglue_save_meta_box( $post_id, $post ) {
 	// Save newsletter data.
 	newsletterglue_save_data( $post_id, newsletterglue_sanitize( $_POST ) );
 
+	// Check if send newsletter is requested - check the checkbox directly
+	$send_newsletter = isset( $_POST[ 'ngl_send_newsletter' ] ) && $_POST[ 'ngl_send_newsletter' ] == '1' ? true : false;
+
 	// The "Send" checkbox is not checked.
-	if ( ! isset( $_POST[ 'ngl_double_confirm' ] ) || $_POST[ 'ngl_double_confirm' ] !== 'yes' ) {
+	if ( ! $send_newsletter ) {
 		return;
 	}
 

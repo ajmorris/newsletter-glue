@@ -144,10 +144,8 @@
 
 		if ( f.find( '#ngl_send_newsletter' ).is( ':checked' ) ) {
 			$( '#ngl_send_newsletter2' ).prop( 'checked', true );
-			$( '#ngl_double_confirm' ).val( 'yes' );
 		} else {
 			$( '#ngl_send_newsletter2' ).prop( 'checked', false );
-			$( '#ngl_double_confirm' ).val( 'no' );
 		}
 
 		// Campaign Monitor.
@@ -177,7 +175,6 @@
 				$( '.edit-post-header__settings' ).prepend( '<span class="ngl-newsletter-errors">' + newsletterglue_params.publish_error + '</span>' );
 			}
 			$( '.ngl-top-checkbox' ).addClass( 'disable-send' );
-			$( '#ngl_double_confirm' ).val( 'no' );
 		}
 		
 		if ( ! $( '#ngl_send_newsletter' ).is( ':checked' ) ) {
@@ -610,8 +607,6 @@
 
 		var data = 'action=newsletterglue_ajax_reset_newsletter&security=' + newsletterglue_params.ajaxnonce + '&post_id=' + post_id;
 
-		$( '#ngl_double_confirm' ).val( 'no' );
-
 		$.ajax( {
 			type : 'post',
 			url : newsletterglue_params.ajaxurl,
@@ -725,9 +720,11 @@
 	// Trigger newsletter sent message.
 	$( document ).on( 'click', '.editor-post-publish-button', function( event ) {
 
+		// Check if either checkbox is checked (top checkbox OR metabox checkbox)
+		var sendChecked = $( '#ngl_send_newsletter2' ).is( ':checked' ) || $( '#ngl_send_newsletter' ).is( ':checked' );
+
 		// Add message box.
-		if ( $( '#ngl_send_newsletter2' ).is( ':checked' ) ) {
-			$( '#ngl_double_confirm' ).val( 'yes' );
+		if ( sendChecked ) {
 			$( '#ngl_send_newsletter, #ngl_send_newsletter2' ).prop( 'checked', false );
 			$( '.ngl-msgbox-wrap' ).removeClass( 'is-hidden' );
 			$( '.ngl-reset' ).addClass( 'is-hidden' );
@@ -753,10 +750,6 @@
 				}, 3000 );
 			}
 
-		} else {
-			if ( $( '#ngl_double_confirm' ).val() == 'yes' ) {
-				$( '#ngl_double_confirm' ).val( 'no' );
-			}
 		}
 
 	} );
@@ -1206,7 +1199,6 @@
 			switch (String.fromCharCode(event.which).toLowerCase()) {
 			case 's':
 				event.preventDefault();
-				$( '#ngl_double_confirm' ).val( 'no' );
 				break;
 			}
 		}

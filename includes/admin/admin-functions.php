@@ -174,7 +174,7 @@ function newsletterglue_deactivate_modal() {
 	require_once NGL_PLUGIN_DIR . 'includes/admin/deactivate.php';
 
 }
-add_action( 'admin_footer', 'newsletterglue_deactivate_modal' );
+// add_action( 'admin_footer', 'newsletterglue_deactivate_modal' );
 
 /**
  * Send feedback regarding new connections.

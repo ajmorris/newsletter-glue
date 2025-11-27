@@ -175,17 +175,29 @@ function newsletterglue_send( $post_id = 0, $test = false ) {
 	$post = get_post( $post_id );
 	$data = get_post_meta( $post_id, '_newsletterglue', true );
 
+	if ( empty( $data ) ) {
+		return false;
+	}
+
 	if ( ! $test ) {
 		$data[ 'sent' ] = true;
 	}
 
 	update_post_meta( $post_id, '_newsletterglue', $data );
 
-	$app = $data[ 'app' ];
+	$app = isset( $data[ 'app' ] ) ? $data[ 'app' ] : '';
+
+	if ( empty( $app ) ) {
+		return false;
+	}
 
 	include_once newsletterglue_get_path( $app ) . '/init.php';
 
 	$classname = 'NGL_' . ucfirst( $app );
+
+	if ( ! class_exists( $classname ) ) {
+		return false;
+	}
 
 	$api = new $classname();
 
