@@ -220,6 +220,7 @@ class NGL_Upgrade {
 			'blocks'		=> __( 'Newsletter blocks', 'newsletter-glue' ),
 			'css' 			=> __( 'Custom CSS', 'newsletter-glue' ),
 			'additional'	=> __( 'Additional', 'newsletter-glue' ),
+			'logs'			=> __( 'Logs', 'newsletter-glue' ),
 			// Removed: Pro license tab
 			// 'license'		=> __( 'Pro license', 'newsletterg-lue' ),
 		);
