@@ -253,6 +253,58 @@ class NGL_Block_Author extends NGL_Abstract_Block {
 
 	}
 
+	/**
+	 * Save settings.
+	 */
+	public function save_settings() {
+
+		$defaults = get_option( $this->id );
+
+		if ( ! $defaults ) {
+			$defaults = $this->get_defaults();
+		}
+
+		// Save checkbox values
+		$defaults['showAvatar'] = isset( $_POST['showAvatar'] ) && $_POST['showAvatar'] === 'yes';
+		$defaults['showName'] = isset( $_POST['showName'] ) && $_POST['showName'] === 'yes';
+		$defaults['showBio'] = isset( $_POST['showBio'] ) && $_POST['showBio'] === 'yes';
+		$defaults['showMoreLink'] = isset( $_POST['showMoreLink'] ) && $_POST['showMoreLink'] === 'yes';
+
+		// Save number values
+		if ( isset( $_POST['avatarSize'] ) ) {
+			$defaults['avatarSize'] = absint( $_POST['avatarSize'] );
+			// Validate range
+			if ( $defaults['avatarSize'] < 24 ) {
+				$defaults['avatarSize'] = 24;
+			} elseif ( $defaults['avatarSize'] > 200 ) {
+				$defaults['avatarSize'] = 200;
+			}
+		}
+
+		if ( isset( $_POST['maxBioChars'] ) ) {
+			$defaults['maxBioChars'] = absint( $_POST['maxBioChars'] );
+			// Validate range
+			if ( $defaults['maxBioChars'] < 0 ) {
+				$defaults['maxBioChars'] = 0;
+			} elseif ( $defaults['maxBioChars'] > 500 ) {
+				$defaults['maxBioChars'] = 500;
+			}
+		}
+
+		// Save alignment
+		if ( isset( $_POST['alignment'] ) ) {
+			$alignment = sanitize_text_field( $_POST['alignment'] );
+			if ( in_array( $alignment, array( 'left', 'center' ), true ) ) {
+				$defaults['alignment'] = $alignment;
+			}
+		}
+
+		update_option( $this->id, $defaults );
+
+		return $defaults;
+
+	}
+
 }
 
 return new NGL_Block_Author;

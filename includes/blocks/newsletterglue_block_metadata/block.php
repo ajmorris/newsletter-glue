@@ -10,6 +10,7 @@ if ( ! class_exists( 'NGL_Abstract_Block', false ) ) {
 class NGL_Block_Metadata extends NGL_Abstract_Block {
 
 	public $id = 'newsletterglue_block_metadata';
+	public $is_pro = false;
 
 	/**
 	 * Construct.
@@ -43,6 +44,62 @@ class NGL_Block_Metadata extends NGL_Abstract_Block {
 	 */
 	public function get_description() {
 		return __( 'Add standard meta data to each post.', 'newsletter-glue' );
+	}
+
+	/**
+	 * Get defaults.
+	 */
+	public function get_defaults() {
+		return array(
+			'show_author'		=> true,
+			'show_date'			=> false,
+			'show_location'		=> false,
+			'show_readonline'	=> false,
+			'alignment'			=> 'left',
+			'text_color'		=> '#666666',
+			'date_format'		=> 'l, j M Y',
+		);
+	}
+
+	/**
+	 * Save settings.
+	 */
+	public function save_settings() {
+
+		$defaults = get_option( $this->id );
+
+		if ( ! $defaults ) {
+			$defaults = $this->get_defaults();
+		}
+
+		// Save checkbox values
+		$defaults['show_author'] = isset( $_POST['show_author'] ) && $_POST['show_author'] === 'yes';
+		$defaults['show_date'] = isset( $_POST['show_date'] ) && $_POST['show_date'] === 'yes';
+		$defaults['show_location'] = isset( $_POST['show_location'] ) && $_POST['show_location'] === 'yes';
+		$defaults['show_readonline'] = isset( $_POST['show_readonline'] ) && $_POST['show_readonline'] === 'yes';
+
+		// Save alignment
+		if ( isset( $_POST['alignment'] ) ) {
+			$alignment = sanitize_text_field( $_POST['alignment'] );
+			if ( in_array( $alignment, array( 'left', 'center', 'right' ), true ) ) {
+				$defaults['alignment'] = $alignment;
+			}
+		}
+
+		// Save text color
+		if ( isset( $_POST['text_color'] ) ) {
+			$defaults['text_color'] = sanitize_text_field( $_POST['text_color'] );
+		}
+
+		// Save date format
+		if ( isset( $_POST['date_format'] ) ) {
+			$defaults['date_format'] = sanitize_text_field( $_POST['date_format'] );
+		}
+
+		update_option( $this->id, $defaults );
+
+		return $defaults;
+
 	}
 
 }

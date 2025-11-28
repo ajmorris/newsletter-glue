@@ -721,6 +721,16 @@ function newsletterglue_ajax_save_field() {
 		die();
 	}
 
+	// Handle editor settings location.
+	if ( $id == 'ng_editor_settings_location' ) {
+		$allowed_values = array( 'metabox', 'panel' );
+		if ( in_array( $value, $allowed_values ) ) {
+			update_option( 'newsletterglue_editor_settings_location', sanitize_text_field( $value ) );
+		}
+		wp_send_json( $result );
+		die();
+	}
+
 	if ( in_array( $id, $single_options ) ) {
 
 		update_option( 'newsletterglue_' . $id, $value );

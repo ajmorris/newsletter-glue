@@ -10,6 +10,7 @@ if ( ! class_exists( 'NGL_Abstract_Block', false ) ) {
 class NGL_Block_Article extends NGL_Abstract_Block {
 
 	public $id = 'newsletterglue_block_article';
+	public $is_pro = false;
 
 	/**
 	 * Construct.
@@ -41,6 +42,36 @@ class NGL_Block_Article extends NGL_Abstract_Block {
 	 */
 	public function get_description() {
 		return __( 'Bulk embed articles and customise their layout.', 'newsletter-glue' );
+	}
+
+	/**
+	 * Get defaults.
+	 */
+	public function get_defaults() {
+		return array(
+			'showblog'	=> false,
+			'showemail'	=> true,
+		);
+	}
+
+	/**
+	 * Save settings.
+	 */
+	public function save_settings() {
+
+		$defaults = get_option( $this->id );
+
+		if ( ! $defaults ) {
+			$defaults = $this->get_defaults();
+		}
+
+		$defaults['showblog'] = isset( $_POST['showblog'] ) && $_POST['showblog'] === 'yes';
+		$defaults['showemail'] = isset( $_POST['showemail'] ) && $_POST['showemail'] === 'yes';
+
+		update_option( $this->id, $defaults );
+
+		return $defaults;
+
 	}
 
 }

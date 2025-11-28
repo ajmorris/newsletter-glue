@@ -10,6 +10,7 @@ if ( ! class_exists( 'NGL_Abstract_Block', false ) ) {
 class NGL_Block_Share extends NGL_Abstract_Block {
 
 	public $id = 'newsletterglue_block_share';
+	public $is_pro = false;
 
 	/**
 	 * Construct.
@@ -41,6 +42,74 @@ class NGL_Block_Share extends NGL_Abstract_Block {
 	 */
 	public function get_description() {
 		return __( 'Add social sharing links to your newsletter.', 'newsletter-glue' );
+	}
+
+	/**
+	 * Get defaults.
+	 */
+	public function get_defaults() {
+		return array(
+			'icon_size'		=> 18,
+			'icon_shape'	=> 'default',
+			'icon_color'	=> 'grey',
+			'alignment'		=> 'left',
+			'add_description' => false,
+		);
+	}
+
+	/**
+	 * Save settings.
+	 */
+	public function save_settings() {
+
+		$defaults = get_option( $this->id );
+
+		if ( ! $defaults ) {
+			$defaults = $this->get_defaults();
+		}
+
+		// Save icon size
+		if ( isset( $_POST['icon_size'] ) ) {
+			$defaults['icon_size'] = absint( $_POST['icon_size'] );
+			// Validate range
+			if ( $defaults['icon_size'] < 12 ) {
+				$defaults['icon_size'] = 12;
+			} elseif ( $defaults['icon_size'] > 48 ) {
+				$defaults['icon_size'] = 48;
+			}
+		}
+
+		// Save icon color
+		if ( isset( $_POST['icon_color'] ) ) {
+			$icon_color = sanitize_text_field( $_POST['icon_color'] );
+			if ( in_array( $icon_color, array( 'grey', 'white', 'black' ), true ) ) {
+				$defaults['icon_color'] = $icon_color;
+			}
+		}
+
+		// Save icon shape
+		if ( isset( $_POST['icon_shape'] ) ) {
+			$icon_shape = sanitize_text_field( $_POST['icon_shape'] );
+			if ( in_array( $icon_shape, array( 'default', 'rounded', 'circle' ), true ) ) {
+				$defaults['icon_shape'] = $icon_shape;
+			}
+		}
+
+		// Save alignment
+		if ( isset( $_POST['alignment'] ) ) {
+			$alignment = sanitize_text_field( $_POST['alignment'] );
+			if ( in_array( $alignment, array( 'left', 'center', 'right' ), true ) ) {
+				$defaults['alignment'] = $alignment;
+			}
+		}
+
+		// Save add_description checkbox
+		$defaults['add_description'] = isset( $_POST['add_description'] ) && $_POST['add_description'] === 'yes';
+
+		update_option( $this->id, $defaults );
+
+		return $defaults;
+
 	}
 
 }

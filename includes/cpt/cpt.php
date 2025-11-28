@@ -906,9 +906,41 @@ class NGL_CPT {
 			time()
 		);
 
+		// Check if panel should be loaded instead of metabox.
+		$settings_location = get_option( 'newsletterglue_editor_settings_location', 'metabox' );
+		
+		if ( $settings_location === 'panel' ) {
+			// Enqueue newsletter panel script.
+			wp_enqueue_script(
+				'ngl-panel-js',
+				$js_dir . 'newsletter-panel.js',
+				array( 'wp-blocks', 'wp-element', 'wp-edit-post', 'wp-plugins', 'wp-data', 'wp-components', 'wp-api-fetch' ),
+				time()
+			);
+
+			// Enqueue panel styles.
+			wp_enqueue_style(
+				'ngl-panel-css',
+				NGL_PLUGIN_URL . 'assets/css/newsletter-panel.css',
+				array(),
+				time()
+			);
+
+			// Localize script with necessary data.
+			global $post;
+			$app = newsletterglue_default_connection();
+			$panel_data = array(
+				'settings_url' => admin_url( 'admin.php?page=ngl-settings' ),
+				'appName' => $app ? newsletterglue_get_name( $app ) : '',
+			);
+			
+			wp_localize_script( 'ngl-panel-js', 'newsletterglue_meta', $panel_data );
+		}
+
 		// Enqueue confirmation panel script.
+		// Always enable for panel mode, or if explicitly enabled.
 		$confirmation_enabled = get_option( 'newsletterglue_send_confirmation_enabled', 'no' );
-		if ( $confirmation_enabled === 'yes' ) {
+		if ( $confirmation_enabled === 'yes' || $settings_location === 'panel' ) {
 			wp_enqueue_script(
 				'ngl-confirm-send-js',
 				$js_dir . 'confirm-send.js',
@@ -920,6 +952,7 @@ class NGL_CPT {
 			global $post;
 			$newsletter_data = array(
 				'confirmationEnabled' => 'yes', // Use string to avoid wp_localize_script conversion issues.
+				'settingsLocation' => $settings_location,
 			);
 
 			if ( isset( $post->ID ) ) {
@@ -931,15 +964,31 @@ class NGL_CPT {
 				$newsletter_data['segment'] = isset( $settings->segment ) ? $settings->segment : '';
 				$newsletter_data['app'] = $app;
 				$newsletter_data['appName'] = $app ? newsletterglue_get_name( $app ) : '';
+				$newsletter_data['audienceName'] = '';
 
-				// Get list name.
+				// Get list/audience name.
 				if ( $app && $newsletter_data['audience'] ) {
 					include_once newsletterglue_get_path( $app ) . '/init.php';
 					$classname = 'NGL_' . ucfirst( $app );
 					$api = new $classname();
-					$lists = $api->_get_lists_compat();
+					
+					// Connect the API first.
+					if ( method_exists( $api, 'connect' ) ) {
+						$api->connect();
+					}
+					
+					// Try to get lists using _get_lists_compat or other methods.
+					$lists = array();
+					if ( method_exists( $api, '_get_lists_compat' ) ) {
+						$lists = $api->_get_lists_compat();
+					} else if ( method_exists( $api, 'get_audiences' ) ) {
+						$lists = $api->get_audiences();
+					}
+					
 					if ( isset( $lists[ $newsletter_data['audience'] ] ) ) {
 						$newsletter_data['audienceName'] = $lists[ $newsletter_data['audience'] ];
+					} else {
+						$newsletter_data['audienceName'] = $newsletter_data['audience'];
 					}
 				}
 			}

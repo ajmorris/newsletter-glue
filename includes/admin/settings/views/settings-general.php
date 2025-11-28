@@ -101,4 +101,41 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 </div>
 
+<div class="ui large header" style="margin-top: 2em;">
+
+	<?php esc_html_e( 'Editor Settings', 'newsletter-glue' ); ?>
+
+	<div class="sub header"><?php echo wp_kses_post( __( 'Configure how newsletter settings appear in the block editor.', 'newsletter-glue' ) ); ?></div>
+
+</div>
+
+<div class="ngl-metabox">
+
+	<div class="ngl-metabox-flex">
+		<div class="ngl-metabox-flex">
+			<div class="ngl-metabox-header">
+				<label for="ng_editor_settings_location"><?php esc_html_e( 'Settings location', 'newsletter-glue' ); ?></label>
+			</div>
+			<div class="ngl-field">
+				<?php
+					$settings_location = get_option( 'newsletterglue_editor_settings_location', 'metabox' );
+					$location_options = array(
+						'metabox' => __( 'Meta Box (below editor)', 'newsletter-glue' ),
+						'panel'   => __( 'Sidebar Panel (right side)', 'newsletter-glue' ),
+					);
+					newsletterglue_select_field( array(
+						'id' 			=> 'ng_editor_settings_location',
+						'legacy'		=> true,
+						'helper'		=> __( 'Choose where newsletter settings should appear in the block editor.', 'newsletter-glue' ),
+						'options'		=> $location_options,
+						'default'		=> $settings_location,
+						'class'			=> 'ngl-ajax',
+					) );
+				?>
+			</div>
+		</div>
+	</div>
+
+</div>
+
 <?php do_action( 'newsletterglue_edit_more_settings', $app, $api->get_settings(), true ); ?>

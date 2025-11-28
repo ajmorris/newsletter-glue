@@ -60,88 +60,158 @@
 			}
 		}, [] );
 
-		// Check if "Send as newsletter" is checked.
-		useEffect( () => {
-			const checkSendStatus = () => {
-				if ( typeof jQuery !== 'undefined' ) {
-					const checked = jQuery( '#ngl_send_newsletter' ).is( ':checked' ) || jQuery( '#ngl_send_newsletter2' ).is( ':checked' );
-					setSendChecked( checked );
-					
-					if ( checked ) {
-						// Get newsletter data.
-						const data = {
-							subject: '',
-							audience: '',
-							audienceName: '',
-							segment: '',
-							app: '',
-							appName: '',
-						};
+	// Check if "Send as newsletter" is checked.
+	useEffect( () => {
+		let unsubscribe = null;
+		
+		const checkSendStatus = () => {
+			let checked = false;
+			let metaData = {};
 
-						// Try to get from localized script.
-						if ( typeof newsletterglueConfirm !== 'undefined' ) {
-							data.subject = newsletterglueConfirm.subject || '';
-							data.audience = newsletterglueConfirm.audience || '';
-							data.audienceName = newsletterglueConfirm.audienceName || '';
-							data.segment = newsletterglueConfirm.segment || '';
-							data.app = newsletterglueConfirm.app || '';
-							data.appName = newsletterglueConfirm.appName || '';
-						}
-
-						// Fallback: get from metabox fields.
-						if ( typeof jQuery !== 'undefined' ) {
-							if ( ! data.subject ) {
-								const subjectField = jQuery( '#ngl_subject' );
-								if ( subjectField.length ) {
-									data.subject = subjectField.val() || '';
-								}
-							}
-
-							if ( ! data.audience ) {
-								const audienceField = jQuery( '#ngl_audience' );
-								if ( audienceField.length ) {
-									data.audience = audienceField.val() || '';
-									const selectedOption = audienceField.find( 'option:selected' );
-									if ( selectedOption.length ) {
-										data.audienceName = selectedOption.text() || data.audience;
-									}
-								}
-							}
-
-							if ( ! data.segment ) {
-								const segmentField = jQuery( '#ngl_segment' );
-								if ( segmentField.length ) {
-									const segmentValue = segmentField.val();
-									if ( segmentValue && segmentValue !== '_everyone' ) {
-										const selectedOption = segmentField.find( 'option:selected' );
-										data.segment = selectedOption.length ? selectedOption.text() : segmentValue;
-									}
-								}
-							}
-						}
-
-						// Fallback to post title if no subject.
-						if ( ! data.subject ) {
-							try {
-								const title = wp.data.select( 'core/editor' ).getEditedPostAttribute( 'title' );
-								data.subject = title || '';
-							} catch ( e ) {
-								// Silent fallback.
-							}
-						}
-
-						setNewsletterData( data );
+			// First, try to get from REST API meta (for panel mode).
+			try {
+				if ( typeof wp !== 'undefined' && wp.data && wp.data.select ) {
+					const meta = wp.data.select( 'core/editor' ).getEditedPostAttribute( 'meta' );
+					if ( meta && meta._newsletterglue ) {
+						metaData = meta._newsletterglue;
+						// Check if send_newsletter is enabled.
+						checked = metaData.send_newsletter === '1' || metaData.send_newsletter === 1;
 					}
 				}
-			};
+			} catch ( e ) {
+				// Silent fallback.
+			}
+
+			// Fallback: Check metabox checkboxes (for metabox mode).
+			if ( ! checked && typeof jQuery !== 'undefined' ) {
+				checked = jQuery( '#ngl_send_newsletter' ).is( ':checked' ) || jQuery( '#ngl_send_newsletter2' ).is( ':checked' );
+			}
+
+			setSendChecked( checked );
+			
+			if ( checked ) {
+				// Get newsletter data.
+				const data = {
+					subject: '',
+					audience: '',
+					audienceName: '',
+					segment: '',
+					segmentName: '',
+					app: '',
+					appName: '',
+				};
+
+				// Try to get from localized script.
+				if ( typeof newsletterglueConfirm !== 'undefined' ) {
+					data.subject = newsletterglueConfirm.subject || '';
+					data.audience = newsletterglueConfirm.audience || '';
+					data.audienceName = newsletterglueConfirm.audienceName || '';
+					data.segment = newsletterglueConfirm.segment || '';
+					data.app = newsletterglueConfirm.app || '';
+					data.appName = newsletterglueConfirm.appName || '';
+				}
+
+				// Try to get from REST API meta (panel mode).
+				if ( metaData && Object.keys( metaData ).length > 0 ) {
+					// Subject
+					if ( ! data.subject && metaData.subject ) {
+						data.subject = metaData.subject;
+					}
+					// Audience
+					if ( ! data.audience && metaData.audience ) {
+						data.audience = metaData.audience;
+					}
+					if ( ! data.audienceName && metaData.audienceName ) {
+						data.audienceName = metaData.audienceName;
+					}
+					// Segment - prioritize segmentName over segment ID.
+					if ( metaData.segmentName && metaData.segmentName !== '' ) {
+						// Use the stored segment name.
+						data.segmentName = metaData.segmentName;
+						data.segment = metaData.segmentName; // Also set segment for backward compatibility.
+					} else if ( metaData.segment && metaData.segment !== '_everyone' && metaData.segment !== '' ) {
+						// Fallback to segment ID if name not available.
+						data.segment = metaData.segment;
+						data.segmentName = ''; // No name available.
+					} else {
+						// Segment is '_everyone' or not set.
+						data.segment = '_everyone';
+						data.segmentName = '';
+					}
+					// App info
+					if ( ! data.app && metaData.app ) {
+						data.app = metaData.app;
+					}
+					if ( ! data.appName && metaData.appName ) {
+						data.appName = metaData.appName;
+					}
+				}
+
+				// Fallback: get from metabox fields (metabox mode).
+				if ( typeof jQuery !== 'undefined' ) {
+					if ( ! data.subject ) {
+						const subjectField = jQuery( '#ngl_subject' );
+						if ( subjectField.length ) {
+							data.subject = subjectField.val() || '';
+						}
+					}
+
+					if ( ! data.audience ) {
+						const audienceField = jQuery( '#ngl_audience' );
+						if ( audienceField.length ) {
+							data.audience = audienceField.val() || '';
+							const selectedOption = audienceField.find( 'option:selected' );
+							if ( selectedOption.length ) {
+								data.audienceName = selectedOption.text() || data.audience;
+							}
+						}
+					}
+
+					if ( ! data.segment ) {
+						const segmentField = jQuery( '#ngl_segment' );
+						if ( segmentField.length ) {
+							const segmentValue = segmentField.val();
+							if ( segmentValue && segmentValue !== '_everyone' ) {
+								const selectedOption = segmentField.find( 'option:selected' );
+								data.segment = selectedOption.length ? selectedOption.text() : segmentValue;
+							}
+						}
+					}
+				}
+
+				// Fallback to post title if no subject.
+				if ( ! data.subject ) {
+					try {
+						const title = wp.data.select( 'core/editor' ).getEditedPostAttribute( 'title' );
+						data.subject = title || '';
+					} catch ( e ) {
+						// Silent fallback.
+					}
+				}
+
+				setNewsletterData( data );
+			}
+		};
 
 			// Check immediately.
 			checkSendStatus();
 
 			// Check on interval to catch changes.
 			const interval = setInterval( checkSendStatus, 500 );
+			
+			// Subscribe to meta changes for real-time updates (panel mode).
+			try {
+				if ( typeof wp !== 'undefined' && wp.data && wp.data.subscribe ) {
+					unsubscribe = wp.data.subscribe( () => {
+						// Re-check when meta changes.
+						checkSendStatus();
+					} );
+				}
+			} catch ( e ) {
+				// Silent fallback.
+			}
 
-			// Also listen for changes to the checkbox.
+			// Also listen for changes to the checkbox (metabox mode).
 			if ( typeof jQuery !== 'undefined' ) {
 				jQuery( document ).on( 'change', '#ngl_send_newsletter, #ngl_send_newsletter2', checkSendStatus );
 			}
@@ -150,6 +220,9 @@
 				clearInterval( interval );
 				if ( typeof jQuery !== 'undefined' ) {
 					jQuery( document ).off( 'change', '#ngl_send_newsletter, #ngl_send_newsletter2', checkSendStatus );
+				}
+				if ( unsubscribe ) {
+					unsubscribe();
 				}
 			};
 		}, [] );
@@ -166,9 +239,56 @@
 			return null;
 		}
 
-		const subject = newsletterData.subject || '';
-		const audienceName = newsletterData.audienceName || newsletterData.audience || __( 'Unknown', 'newsletter-glue' );
-		const segment = newsletterData.segment && newsletterData.segment !== '_everyone' ? newsletterData.segment : '';
+		const subject = newsletterData.subject || __( 'Not set', 'newsletter-glue' );
+		
+		// Get audience name - try multiple sources.
+		let audienceName = '';
+		if ( newsletterData.audienceName ) {
+			audienceName = newsletterData.audienceName;
+		} else if ( newsletterData.audience ) {
+			audienceName = newsletterData.audience;
+		} else {
+			audienceName = __( 'Not set', 'newsletter-glue' );
+		}
+		
+		// Get segment name - always show segment info for clarity.
+		let segmentDisplay = '';
+		
+		// First check if we have a segment name stored in state.
+		if ( newsletterData.segmentName && newsletterData.segmentName !== '' ) {
+			segmentDisplay = newsletterData.segmentName;
+		} 
+		// If no name in state, check if we have a segment ID (not '_everyone').
+		else if ( newsletterData.segment && newsletterData.segment !== '_everyone' && newsletterData.segment !== '' ) {
+			// Try to get segment name from current meta if available (real-time check).
+			try {
+				if ( typeof wp !== 'undefined' && wp.data && wp.data.select ) {
+					const meta = wp.data.select( 'core/editor' ).getEditedPostAttribute( 'meta' );
+					if ( meta && meta._newsletterglue ) {
+						// Check for segmentName in current meta.
+						if ( meta._newsletterglue.segmentName && meta._newsletterglue.segmentName !== '' ) {
+							segmentDisplay = meta._newsletterglue.segmentName;
+						} else {
+							// Fallback to showing the segment ID.
+							segmentDisplay = newsletterData.segment;
+						}
+					} else {
+						// Fallback to showing the segment ID.
+						segmentDisplay = newsletterData.segment;
+					}
+				} else {
+					segmentDisplay = newsletterData.segment;
+				}
+			} catch ( e ) {
+				// Fallback to segment ID.
+				segmentDisplay = newsletterData.segment;
+			}
+		}
+		// If segment is '_everyone' or not set, show "Everyone".
+		else {
+			segmentDisplay = __( 'Everyone', 'newsletter-glue' );
+		}
+		
 		const appName = newsletterData.appName || '';
 
 		return el( PluginPrePublishPanel,
@@ -183,15 +303,16 @@
 				),
 				el( 'div', { style: { marginBottom: '12px' } },
 					el( 'strong', { style: { display: 'inline-block', minWidth: '80px' } }, __( 'Subject: ', 'newsletter-glue' ) ),
-					el( 'span', {}, subject || __( '(not set)', 'newsletter-glue' ) )
+					el( 'span', {}, subject )
 				),
 				el( 'div', { style: { marginBottom: '12px' } },
 					el( 'strong', { style: { display: 'inline-block', minWidth: '80px' } }, __( 'Audience: ', 'newsletter-glue' ) ),
 					el( 'span', {}, audienceName )
 				),
-				segment && el( 'div', { style: { marginBottom: '12px' } },
+				// Always show segment field for clarity.
+				el( 'div', { style: { marginBottom: '12px' } },
 					el( 'strong', { style: { display: 'inline-block', minWidth: '80px' } }, __( 'Segment: ', 'newsletter-glue' ) ),
-					el( 'span', {}, segment )
+					el( 'span', {}, segmentDisplay )
 				),
 				appName && el( 'div', { style: { marginBottom: '12px' } },
 					el( 'strong', { style: { display: 'inline-block', minWidth: '80px' } }, __( 'Service: ', 'newsletter-glue' ) ),
