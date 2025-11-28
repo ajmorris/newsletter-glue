@@ -56,6 +56,8 @@ function NewsletterGluePanel() {
 	const [ testResult, setTestResult ] = useState( null );
 	const [ testEmailByWordPress, setTestEmailByWordPress ] = useState( false );
 	const [ appName, setAppName ] = useState( '' );
+	const [ subjectError, setSubjectError ] = useState( false );
+	const [ isResetting, setIsResetting ] = useState( false );
 
 	// Get newsletter data from meta.
 	const newsletterData = meta._newsletterglue || {};
@@ -161,6 +163,23 @@ function NewsletterGluePanel() {
 		}
 	}, [ selectedAudience ] );
 
+	// Validate subject field.
+	const validateSubject = ( subjectValue, sendNewsletter ) => {
+		const sendChecked = sendNewsletter === '1' || sendNewsletter === 1 || 
+			( sendNewsletter === undefined && ( newsletterData.send_newsletter === '1' || newsletterData.send_newsletter === 1 ) );
+		const isEmpty = ! subjectValue || subjectValue.trim() === '';
+		
+		// Show error if send is checked and subject is empty.
+		setSubjectError( sendChecked && isEmpty );
+	};
+	
+	// Validate subject when send_newsletter or subject changes.
+	useEffect( () => {
+		const subject = newsletterData.subject || defaults.subject || '';
+		const sendChecked = newsletterData.send_newsletter === '1' || newsletterData.send_newsletter === 1;
+		validateSubject( subject, sendChecked ? '1' : '0' );
+	}, [ newsletterData.send_newsletter, newsletterData.subject ] );
+
 	// Helper function to update newsletter meta.
 	const updateNewsletterMeta = ( key, value ) => {
 		const updatedData = { 
@@ -169,6 +188,11 @@ function NewsletterGluePanel() {
 			app: app // Always store the app name.
 		};
 		editPost( { meta: { _newsletterglue: updatedData } } );
+		
+		// Validate subject if it's being updated and send_newsletter is checked.
+		if ( key === 'subject' ) {
+			validateSubject( value, updatedData.send_newsletter );
+		}
 	};
 
 	// Handle audience change.
@@ -272,6 +296,57 @@ function NewsletterGluePanel() {
 		return previewUrl + separator + 'preview_email=' + postId;
 	};
 
+	// Handle reset newsletter (send another).
+	const handleResetNewsletter = () => {
+		if ( ! postId || isResetting ) {
+			return;
+		}
+
+		setIsResetting( true );
+
+		// Use REST API endpoint for consistency with panel architecture.
+		apiFetch( {
+			path: '/newsletterglue/v1/reset-newsletter',
+			method: 'POST',
+			data: {
+				post_id: postId,
+			},
+		} )
+		.then( () => {
+			// Reset the sent state locally.
+			setIsSent( false );
+			setIsScheduled( false );
+			
+			// Update meta to remove sent flag and reset send_newsletter.
+			const updatedData = { 
+				...newsletterData,
+				sent: undefined, // Remove sent flag
+				send_newsletter: '0', // Reset send toggle
+			};
+			editPost( { meta: { _newsletterglue: updatedData } } );
+			
+			// Reload defaults to refresh the panel.
+			setIsLoading( true );
+			apiFetch( { 
+				path: `/newsletterglue/v1/defaults/${postId}` 
+			} )
+			.then( ( response ) => {
+				setDefaults( response.defaults || {} );
+				setIsLoading( false );
+				setIsResetting( false );
+			} )
+			.catch( ( error ) => {
+				console.error( 'Error reloading defaults:', error );
+				setIsLoading( false );
+				setIsResetting( false );
+			} );
+		} )
+		.catch( ( error ) => {
+			console.error( 'Error resetting newsletter:', error );
+			setIsResetting( false );
+		} );
+	};
+
 	// Don't show for patterns.
 	if ( postType === 'ngl_pattern' ) {
 		return null;
@@ -327,10 +402,17 @@ function NewsletterGluePanel() {
 			}, 
 				isScheduled ? 'Newsletter scheduled to send when published.' : 'Newsletter has been sent.'
 			),
-			el( 'p', { style: { fontSize: '13px', color: '#757575' } },
-				'To send again, use the ',
-				el( 'strong', {}, 'Send another newsletter' ),
-				' option from the meta box below the editor.'
+			el( PanelRow, {},
+				el( Button, {
+					isSecondary: true,
+					isBusy: isResetting,
+					onClick: handleResetNewsletter,
+					disabled: isResetting,
+					style: { marginTop: '12px' },
+				}, isResetting ? 'Resetting...' : 'Send another newsletter' )
+			),
+			el( 'p', { style: { fontSize: '13px', color: '#757575', marginTop: '12px' } },
+				'Click the button above to send another newsletter with different settings.'
 			)
 		);
 	}
@@ -360,12 +442,19 @@ function NewsletterGluePanel() {
 			className: 'newsletterglue-panel',
 		},
 		
+		// Subject line error notice.
+		subjectError && el( Notice, {
+			status: 'error',
+			isDismissible: false,
+		}, 'Subject is required when sending as newsletter.' ),
+		
 		// Subject line.
 		el( TextControl, {
 			label: 'Subject',
 			value: newsletterData.subject || defaults.subject || '',
 			onChange: ( value ) => updateNewsletterMeta( 'subject', value ),
-			help: 'Short, catchy subject lines get more opens.',
+			help: subjectError ? 'This field is required.' : 'Short, catchy subject lines get more opens.',
+			className: subjectError ? 'has-error' : '',
 		} ),
 
 		// Preview text.
@@ -494,7 +583,12 @@ function NewsletterGluePanel() {
 			el( ToggleControl, {
 				label: 'Send as newsletter',
 				checked: newsletterData.send_newsletter === '1' || newsletterData.send_newsletter === 1,
-				onChange: ( value ) => updateNewsletterMeta( 'send_newsletter', value ? '1' : '0' ),
+				onChange: ( value ) => {
+					updateNewsletterMeta( 'send_newsletter', value ? '1' : '0' );
+					// Validate subject when toggling send_newsletter.
+					const subject = newsletterData.subject || defaults.subject || '';
+					validateSubject( subject, value ? '1' : '0' );
+				},
 				help: 'Send this post as a newsletter when published/updated.',
 			} )
 		),
