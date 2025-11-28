@@ -62,6 +62,8 @@
 
 	// Check if "Send as newsletter" is checked.
 	useEffect( () => {
+		let unsubscribe = null;
+		
 		const checkSendStatus = () => {
 			let checked = false;
 			let metaData = {};
@@ -94,6 +96,7 @@
 					audience: '',
 					audienceName: '',
 					segment: '',
+					segmentName: '',
 					app: '',
 					appName: '',
 				};
@@ -110,22 +113,32 @@
 
 				// Try to get from REST API meta (panel mode).
 				if ( metaData && Object.keys( metaData ).length > 0 ) {
+					// Subject
 					if ( ! data.subject && metaData.subject ) {
 						data.subject = metaData.subject;
 					}
+					// Audience
 					if ( ! data.audience && metaData.audience ) {
 						data.audience = metaData.audience;
 					}
 					if ( ! data.audienceName && metaData.audienceName ) {
 						data.audienceName = metaData.audienceName;
 					}
-					if ( ! data.segment && metaData.segment && metaData.segment !== '_everyone' ) {
+					// Segment - prioritize segmentName over segment ID.
+					if ( metaData.segmentName && metaData.segmentName !== '' ) {
+						// Use the stored segment name.
+						data.segmentName = metaData.segmentName;
+						data.segment = metaData.segmentName; // Also set segment for backward compatibility.
+					} else if ( metaData.segment && metaData.segment !== '_everyone' && metaData.segment !== '' ) {
+						// Fallback to segment ID if name not available.
 						data.segment = metaData.segment;
+						data.segmentName = ''; // No name available.
+					} else {
+						// Segment is '_everyone' or not set.
+						data.segment = '_everyone';
+						data.segmentName = '';
 					}
-					// Also get segment name if available.
-					if ( metaData.segmentName ) {
-						data.segment = metaData.segmentName;
-					}
+					// App info
 					if ( ! data.app && metaData.app ) {
 						data.app = metaData.app;
 					}
@@ -185,8 +198,20 @@
 
 			// Check on interval to catch changes.
 			const interval = setInterval( checkSendStatus, 500 );
+			
+			// Subscribe to meta changes for real-time updates (panel mode).
+			try {
+				if ( typeof wp !== 'undefined' && wp.data && wp.data.subscribe ) {
+					unsubscribe = wp.data.subscribe( () => {
+						// Re-check when meta changes.
+						checkSendStatus();
+					} );
+				}
+			} catch ( e ) {
+				// Silent fallback.
+			}
 
-			// Also listen for changes to the checkbox.
+			// Also listen for changes to the checkbox (metabox mode).
 			if ( typeof jQuery !== 'undefined' ) {
 				jQuery( document ).on( 'change', '#ngl_send_newsletter, #ngl_send_newsletter2', checkSendStatus );
 			}
@@ -195,6 +220,9 @@
 				clearInterval( interval );
 				if ( typeof jQuery !== 'undefined' ) {
 					jQuery( document ).off( 'change', '#ngl_send_newsletter, #ngl_send_newsletter2', checkSendStatus );
+				}
+				if ( unsubscribe ) {
+					unsubscribe();
 				}
 			};
 		}, [] );
@@ -223,12 +251,42 @@
 			audienceName = __( 'Not set', 'newsletter-glue' );
 		}
 		
-		// Get segment name - prioritize segmentName over segment ID.
-		let segment = '';
-		if ( newsletterData.segmentName ) {
-			segment = newsletterData.segmentName;
-		} else if ( newsletterData.segment && newsletterData.segment !== '_everyone' ) {
-			segment = newsletterData.segment;
+		// Get segment name - always show segment info for clarity.
+		let segmentDisplay = '';
+		
+		// First check if we have a segment name stored in state.
+		if ( newsletterData.segmentName && newsletterData.segmentName !== '' ) {
+			segmentDisplay = newsletterData.segmentName;
+		} 
+		// If no name in state, check if we have a segment ID (not '_everyone').
+		else if ( newsletterData.segment && newsletterData.segment !== '_everyone' && newsletterData.segment !== '' ) {
+			// Try to get segment name from current meta if available (real-time check).
+			try {
+				if ( typeof wp !== 'undefined' && wp.data && wp.data.select ) {
+					const meta = wp.data.select( 'core/editor' ).getEditedPostAttribute( 'meta' );
+					if ( meta && meta._newsletterglue ) {
+						// Check for segmentName in current meta.
+						if ( meta._newsletterglue.segmentName && meta._newsletterglue.segmentName !== '' ) {
+							segmentDisplay = meta._newsletterglue.segmentName;
+						} else {
+							// Fallback to showing the segment ID.
+							segmentDisplay = newsletterData.segment;
+						}
+					} else {
+						// Fallback to showing the segment ID.
+						segmentDisplay = newsletterData.segment;
+					}
+				} else {
+					segmentDisplay = newsletterData.segment;
+				}
+			} catch ( e ) {
+				// Fallback to segment ID.
+				segmentDisplay = newsletterData.segment;
+			}
+		}
+		// If segment is '_everyone' or not set, show "Everyone".
+		else {
+			segmentDisplay = __( 'Everyone', 'newsletter-glue' );
 		}
 		
 		const appName = newsletterData.appName || '';
@@ -251,9 +309,10 @@
 					el( 'strong', { style: { display: 'inline-block', minWidth: '80px' } }, __( 'Audience: ', 'newsletter-glue' ) ),
 					el( 'span', {}, audienceName )
 				),
-				segment && el( 'div', { style: { marginBottom: '12px' } },
+				// Always show segment field for clarity.
+				el( 'div', { style: { marginBottom: '12px' } },
 					el( 'strong', { style: { display: 'inline-block', minWidth: '80px' } }, __( 'Segment: ', 'newsletter-glue' ) ),
-					el( 'span', {}, segment )
+					el( 'span', {}, segmentDisplay )
 				),
 				appName && el( 'div', { style: { marginBottom: '12px' } },
 					el( 'strong', { style: { display: 'inline-block', minWidth: '80px' } }, __( 'Service: ', 'newsletter-glue' ) ),
