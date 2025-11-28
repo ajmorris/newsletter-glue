@@ -20,30 +20,30 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 	<div class="ngl-popup-field-header"><?php _e( 'Styling options', 'newsletter-glue' ); ?></div>
 
 	<div class="ngl-popup-field">
-		<label for="bg_color">
+		<label for="bg_color-<?php echo esc_attr( $this->id ); ?>">
 			<span class="ngl-block-use-label"><?php _e( 'Background color', 'newsletter-glue' ); ?></span>
-			<input type="text" id="bg_color" name="bg_color" value="<?php echo isset( $defaults['bg_color'] ) ? esc_attr( $defaults['bg_color'] ) : '#f9f9f9'; ?>" placeholder="#f9f9f9">
+			<input type="text" id="bg_color-<?php echo esc_attr( $this->id ); ?>" name="bg_color" value="<?php echo isset( $defaults['bg_color'] ) ? esc_attr( $defaults['bg_color'] ) : '#f9f9f9'; ?>" placeholder="#f9f9f9">
 		</label>
 	</div>
 
 	<div class="ngl-popup-field">
-		<label for="font_color">
+		<label for="font_color-<?php echo esc_attr( $this->id ); ?>">
 			<span class="ngl-block-use-label"><?php _e( 'Font color', 'newsletter-glue' ); ?></span>
-			<input type="text" id="font_color" name="font_color" value="<?php echo isset( $defaults['font_color'] ) ? esc_attr( $defaults['font_color'] ) : ''; ?>" placeholder="#333333">
+			<input type="text" id="font_color-<?php echo esc_attr( $this->id ); ?>" name="font_color" value="<?php echo isset( $defaults['font_color'] ) ? esc_attr( $defaults['font_color'] ) : ''; ?>" placeholder="#333333">
 		</label>
 	</div>
 
 	<div class="ngl-popup-field">
-		<label for="cta_padding">
+		<label for="cta_padding-<?php echo esc_attr( $this->id ); ?>">
 			<span class="ngl-block-use-label"><?php _e( 'Padding top/bottom (pixels)', 'newsletter-glue' ); ?></span>
-			<input type="number" id="cta_padding" name="cta_padding" value="<?php echo isset( $defaults['cta_padding'] ) ? esc_attr( $defaults['cta_padding'] ) : 0; ?>" min="0" max="100" step="1">
+			<input type="number" id="cta_padding-<?php echo esc_attr( $this->id ); ?>" name="cta_padding" value="<?php echo isset( $defaults['cta_padding'] ) ? esc_attr( $defaults['cta_padding'] ) : 0; ?>" min="0" max="100" step="1">
 		</label>
 	</div>
 
 	<div class="ngl-popup-field">
-		<label for="cta_padding2">
+		<label for="cta_padding2-<?php echo esc_attr( $this->id ); ?>">
 			<span class="ngl-block-use-label"><?php _e( 'Padding left/right (pixels)', 'newsletter-glue' ); ?></span>
-			<input type="number" id="cta_padding2" name="cta_padding2" value="<?php echo isset( $defaults['cta_padding2'] ) ? esc_attr( $defaults['cta_padding2'] ) : 0; ?>" min="0" max="100" step="1">
+			<input type="number" id="cta_padding2-<?php echo esc_attr( $this->id ); ?>" name="cta_padding2" value="<?php echo isset( $defaults['cta_padding2'] ) ? esc_attr( $defaults['cta_padding2'] ) : 0; ?>" min="0" max="100" step="1">
 		</label>
 	</div>
 

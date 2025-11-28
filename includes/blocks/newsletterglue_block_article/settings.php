@@ -20,16 +20,16 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 	<div class="ngl-popup-field-header"><?php _e( 'Display options', 'newsletter-glue' ); ?></div>
 
 	<div class="ngl-popup-field">
-		<label for="showblog">
-			<input type="checkbox" id="showblog" name="showblog" value="yes" <?php if ( isset( $defaults['showblog'] ) && $defaults['showblog'] ) echo 'checked'; ?> >
+		<label for="showblog-<?php echo esc_attr( $this->id ); ?>">
+			<input type="checkbox" id="showblog-<?php echo esc_attr( $this->id ); ?>" name="showblog" value="yes" <?php if ( isset( $defaults['showblog'] ) && $defaults['showblog'] ) echo 'checked'; ?> >
 			<span class="ngl-block-use-switch"></span>
 			<span class="ngl-block-use-label"><?php _e( 'Show in blog post', 'newsletter-glue' ); ?></span>
 		</label>
 	</div>
 
 	<div class="ngl-popup-field">
-		<label for="showemail">
-			<input type="checkbox" id="showemail" name="showemail" value="yes" <?php if ( isset( $defaults['showemail'] ) && $defaults['showemail'] ) echo 'checked'; ?> >
+		<label for="showemail-<?php echo esc_attr( $this->id ); ?>">
+			<input type="checkbox" id="showemail-<?php echo esc_attr( $this->id ); ?>" name="showemail" value="yes" <?php if ( isset( $defaults['showemail'] ) && $defaults['showemail'] ) echo 'checked'; ?> >
 			<span class="ngl-block-use-switch"></span>
 			<span class="ngl-block-use-label"><?php _e( 'Show in email newsletter', 'newsletter-glue' ); ?></span>
 		</label>
