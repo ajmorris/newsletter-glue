@@ -290,10 +290,33 @@ function newsletterglue_process_newsletter_send( $post_id, $post, $source = 'met
 		}
 	}
 	
-	// For panel mode, ensure from_email and from_name use defaults if empty.
+	// For panel mode, ensure critical fields use defaults if empty.
 	// This matches meta box behavior where defaults are pre-filled in the form.
-	// If fields are empty, we should use the same defaults that the meta box uses.
 	if ( $source === 'panel' ) {
+		// Ensure audience is set - critical for Mailchimp and other ESPs.
+		if ( empty( $newsletter_data['audience'] ) ) {
+			$newsletter_data['audience'] = newsletterglue_get_option( 'audience', $app );
+			
+			// If still empty, try to get from integration's default method.
+			if ( empty( $newsletter_data['audience'] ) ) {
+				include_once newsletterglue_get_path( $app ) . '/init.php';
+				$classname = 'NGL_' . ucfirst( $app );
+				if ( class_exists( $classname ) ) {
+					$api_instance = new $classname();
+					if ( method_exists( $api_instance, 'get_default_list_id' ) ) {
+						$newsletter_data['audience'] = $api_instance->get_default_list_id();
+					}
+				}
+			}
+		}
+		
+		// Ensure segment is set (default to '_everyone' if not set).
+		if ( ! isset( $newsletter_data['segment'] ) || empty( $newsletter_data['segment'] ) ) {
+			$newsletter_data['segment'] = newsletterglue_get_option( 'segment', $app );
+			if ( empty( $newsletter_data['segment'] ) ) {
+				$newsletter_data['segment'] = '_everyone';
+			}
+		}
 		// Get default from name if not set or empty - use same function as meta box.
 		if ( empty( $newsletter_data[ 'from_name' ] ) ) {
 			if ( function_exists( 'newsletterglue_get_default_from_name' ) ) {

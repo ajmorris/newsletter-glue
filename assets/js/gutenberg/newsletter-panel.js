@@ -51,10 +51,23 @@ function NewsletterGluePanel() {
 	const [ isLoadingSegments, setIsLoadingSegments ] = useState( false );
 	const [ isSent, setIsSent ] = useState( false );
 	const [ isScheduled, setIsScheduled ] = useState( false );
+	const [ testEmail, setTestEmail ] = useState( '' );
+	const [ isSendingTest, setIsSendingTest ] = useState( false );
+	const [ testResult, setTestResult ] = useState( null );
+	const [ testEmailByWordPress, setTestEmailByWordPress ] = useState( false );
+	const [ appName, setAppName ] = useState( '' );
 
 	// Get newsletter data from meta.
 	const newsletterData = meta._newsletterglue || {};
 	const futureData = meta._ngl_future_send || '';
+
+	const postLink = useSelect( ( select ) => {
+		const post = select( 'core/editor' ).getCurrentPost();
+		if ( post && post.link ) {
+			return post.link;
+		}
+		return null;
+	}, [] );
 
 	// Load defaults and check connection.
 	useEffect( () => {
@@ -66,8 +79,10 @@ function NewsletterGluePanel() {
 			.then( ( response ) => {
 				setIsConnected( response.connected );
 				setApp( response.app );
+				setAppName( response.appName || '' );
 				setDefaults( response.defaults || {} );
 				setAudiences( response.audiences || {} );
+				setTestEmailByWordPress( response.testEmailByWordPress || false );
 				
 				// Set initial audience value - check multiple sources.
 				let initialAudience = '';
@@ -110,6 +125,13 @@ function NewsletterGluePanel() {
 				// Check if scheduled.
 				if ( futureData === 'yes' ) {
 					setIsScheduled( true );
+				}
+
+				// Set initial test email from defaults or stored value.
+				if ( response.defaults && response.defaults.test_email ) {
+					setTestEmail( response.defaults.test_email );
+				} else if ( newsletterData.test_email ) {
+					setTestEmail( newsletterData.test_email );
 				}
 
 				setIsLoading( false );
@@ -182,6 +204,72 @@ function NewsletterGluePanel() {
 			app: app
 		};
 		editPost( { meta: { _newsletterglue: updatedData } } );
+	};
+
+	// Handle test email send.
+	const handleSendTestEmail = () => {
+		if ( ! testEmail || isSendingTest ) {
+			return;
+		}
+
+		setIsSendingTest( true );
+		setTestResult( null );
+
+		// First, ensure all current newsletter data is saved to meta.
+		const currentData = { 
+			...newsletterData,
+			test_email: testEmail,
+			app: app || defaults.app
+		};
+		editPost( { meta: { _newsletterglue: currentData } } );
+
+		// Use the unified REST API endpoint for sending test emails.
+		apiFetch( {
+			path: '/newsletterglue/v1/test-email',
+			method: 'POST',
+			data: {
+				post_id: postId,
+				test_email: testEmail,
+			},
+		} )
+		.then( ( response ) => {
+			setIsSendingTest( false );
+			
+			if ( response && response.success ) {
+				setTestResult( { type: 'success', message: response.success } );
+				// Store test email for next time.
+				updateNewsletterMeta( 'test_email', testEmail );
+			} else {
+				const errorMessage = ( response && response.fail ) 
+					? response.fail 
+					: ( response && response.message )
+						? response.message
+						: ( newsletterglue_meta.unknown_error || 'Could not send test email. Please try again.' );
+				setTestResult( { type: 'error', message: errorMessage } );
+			}
+		} )
+		.catch( ( error ) => {
+			setIsSendingTest( false );
+			const errorMessage = error.message || ( newsletterglue_meta.unknown_error || 'Could not send test email. Please try again.' );
+			setTestResult( { type: 'error', message: errorMessage } );
+		} );
+	};
+
+	// Get preview email URL.
+	const getPreviewEmailUrl = () => {
+		if ( ! postId ) {
+			return '#';
+		}
+		// Use post link if available, otherwise construct preview URL.
+		let previewUrl = postLink;
+		if ( ! previewUrl ) {
+			const siteUrl = window.location.origin;
+			previewUrl = siteUrl + '/?p=' + postId + '&preview=true';
+		}
+		
+		// Add preview_email parameter.
+		const separator = previewUrl.indexOf( '?' ) > -1 ? '&' : '?';
+		return previewUrl + separator + 'preview_email=' + postId;
 	};
 
 	// Don't show for patterns.
@@ -344,6 +432,60 @@ function NewsletterGluePanel() {
 			onChange: ( value ) => updateNewsletterMeta( 'read_link_custom_label', value ),
 			help: 'Leave empty to use the global default.',
 		} ),
+
+		// Test email section.
+		el( 'hr', { style: { margin: '16px 0' } } ),
+		
+		el( BaseControl, {
+			label: 'Send test email',
+			help: 'Send a test email to preview how your newsletter will look.',
+		},
+			el( 'div', { style: { display: 'flex', gap: '8px', alignItems: 'flex-start' } },
+				el( 'div', { style: { flex: '1' } },
+					el( TextControl, {
+						value: testEmail,
+						onChange: ( value ) => setTestEmail( value ),
+						placeholder: 'Enter email address',
+						type: 'email',
+					} )
+				),
+				el( 'div', {},
+					el( Button, {
+						isPrimary: true,
+						isBusy: isSendingTest,
+						onClick: handleSendTestEmail,
+						disabled: ! testEmail || isSendingTest,
+					}, isSendingTest ? 'Sending...' : 'Send' )
+				)
+			),
+			testResult && testResult.type === 'success' && el( Notice, {
+				status: 'success',
+				isDismissible: true,
+				onRemove: () => setTestResult( null ),
+			}, testResult.message || 'Email sent' ),
+			testResult && testResult.type === 'error' && el( Notice, {
+				status: 'error',
+				isDismissible: true,
+				onRemove: () => setTestResult( null ),
+			}, testResult.message || 'Could not send test email. Please try again.' ),
+			testEmailByWordPress && el( Notice, {
+				status: 'info',
+				isDismissible: false,
+			}, el( Fragment, {},
+				'This test email is sent by WordPress. Formatting and deliverability might differ slightly from email campaigns sent by ',
+				el( 'strong', {}, appName || 'your email service provider' ),
+				'.'
+			) )
+		),
+
+		// Preview email link.
+		el( PanelRow, {},
+			el( 'a', {
+				href: getPreviewEmailUrl(),
+				target: '_blank',
+				style: { fontSize: '13px', textDecoration: 'none' },
+			}, 'Preview email in browser', el( 'span', { style: { color: '#757575', marginLeft: '4px' } }, '(opens in new tab)' ) )
+		),
 
 		// Send as newsletter toggle.
 		el( 'hr', { style: { margin: '16px 0' } } ),

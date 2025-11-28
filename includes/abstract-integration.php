@@ -238,7 +238,7 @@ abstract class NGL_Abstract_Integration {
 	 * Test success.
 	 */
 	public function get_test_success_msg() {
-		return '&nbsp;';
+		return __( 'Email sent', 'newsletter-glue' );
 	}
 
 	/**

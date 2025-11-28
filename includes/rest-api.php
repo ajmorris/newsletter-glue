@@ -113,10 +113,17 @@ function newsletterglue_rest_get_defaults( $request ) {
 		$current_audience = $defaults->audience;
 	}
 
+	// Check if test email is sent by WordPress.
+	$test_email_by_wordpress = false;
+	if ( method_exists( $api, 'test_email_by_wordpress' ) ) {
+		$test_email_by_wordpress = $api->test_email_by_wordpress();
+	}
+
 	return array(
 		'connected' => true,
 		'app' => $app,
 		'appName' => newsletterglue_get_name( $app ),
+		'testEmailByWordPress' => $test_email_by_wordpress,
 		'defaults' => $defaults,
 		'settings' => $settings,
 		'audiences' => $audiences,
@@ -211,6 +218,89 @@ function newsletterglue_rest_get_audience_name( $request ) {
 }
 
 /**
+ * Send test email via REST API.
+ * Unified endpoint for both meta box and panel.
+ */
+function newsletterglue_rest_send_test_email( $request ) {
+	
+	if ( ! current_user_can( 'manage_newsletterglue' ) ) {
+		return new WP_Error( 'rest_forbidden', esc_html__( 'You do not have permission to access this endpoint.', 'newsletter-glue' ), array( 'status' => 401 ) );
+	}
+
+	$post_id = $request->get_param( 'post_id' );
+	$test_email = $request->get_param( 'test_email' );
+	
+	if ( ! $post_id ) {
+		return new WP_Error( 'rest_invalid_param', esc_html__( 'Invalid post ID.', 'newsletter-glue' ), array( 'status' => 400 ) );
+	}
+
+	if ( ! $test_email || ! is_email( $test_email ) ) {
+		return new WP_Error( 'rest_invalid_param', esc_html__( 'Invalid email address.', 'newsletter-glue' ), array( 'status' => 400 ) );
+	}
+
+	$post = get_post( $post_id );
+	if ( ! $post ) {
+		return new WP_Error( 'rest_invalid_param', esc_html__( 'Invalid post.', 'newsletter-glue' ), array( 'status' => 400 ) );
+	}
+
+	// Get current newsletter data from meta.
+	$newsletter_data = get_post_meta( $post_id, '_newsletterglue', true );
+	if ( ! is_array( $newsletter_data ) ) {
+		$newsletter_data = array();
+	}
+
+	// Update test email in the data.
+	$newsletter_data['test_email'] = sanitize_email( $test_email );
+
+	// Ensure we have the app set.
+	$app = newsletterglue_default_connection();
+	if ( ! $app ) {
+		return new WP_Error( 'rest_no_app', esc_html__( 'No email service provider connected.', 'newsletter-glue' ), array( 'status' => 400 ) );
+	}
+	
+	if ( empty( $newsletter_data['app'] ) ) {
+		$newsletter_data['app'] = $app;
+	}
+
+	// CRITICAL: Ensure from_email and from_name are set with defaults if empty.
+	// This matches the behavior in newsletterglue_process_newsletter_send() for panel mode.
+	// Mailchimp (and other ESPs) require a valid from_email for domain verification.
+	if ( empty( $newsletter_data['from_name'] ) ) {
+		if ( function_exists( 'newsletterglue_get_default_from_name' ) ) {
+			$newsletter_data['from_name'] = newsletterglue_get_default_from_name();
+		} else {
+			// Fallback to option.
+			$newsletter_data['from_name'] = newsletterglue_get_option( 'from_name', $app );
+		}
+	}
+	
+	// Get default from email if not set or empty - use same source as meta box.
+	if ( empty( $newsletter_data['from_email'] ) ) {
+		$newsletter_data['from_email'] = newsletterglue_get_option( 'from_email', $app );
+		
+		// If still empty, fallback to integration's get_current_user_email().
+		if ( empty( $newsletter_data['from_email'] ) ) {
+			include_once newsletterglue_get_path( $app ) . '/init.php';
+			$classname = 'NGL_' . ucfirst( $app );
+			if ( class_exists( $classname ) ) {
+				$api_instance = new $classname();
+				if ( method_exists( $api_instance, 'get_current_user_email' ) ) {
+					$newsletter_data['from_email'] = $api_instance->get_current_user_email();
+				}
+			}
+		}
+	}
+
+	// Save the updated data with all defaults applied.
+	update_post_meta( $post_id, '_newsletterglue', $newsletter_data );
+
+	// Send the test email using the unified function.
+	$response = newsletterglue_send( $post_id, true );
+
+	return $response;
+}
+
+/**
  * Register REST routes.
  */
 function newsletterglue_register_rest_routes() {
@@ -236,6 +326,30 @@ function newsletterglue_register_rest_routes() {
 		'permission_callback' => function() {
 			return current_user_can( 'manage_newsletterglue' );
 		},
+	) );
+
+	register_rest_route( 'newsletterglue/v1', '/test-email', array(
+		'methods'  => 'POST',
+		'callback' => 'newsletterglue_rest_send_test_email',
+		'permission_callback' => function() {
+			return current_user_can( 'manage_newsletterglue' );
+		},
+		'args' => array(
+			'post_id' => array(
+				'required' => true,
+				'type' => 'integer',
+				'validate_callback' => function( $param ) {
+					return is_numeric( $param ) && $param > 0;
+				},
+			),
+			'test_email' => array(
+				'required' => true,
+				'type' => 'string',
+				'validate_callback' => function( $param ) {
+					return is_email( $param );
+				},
+			),
+		),
 	) );
 }
 add_action( 'rest_api_init', 'newsletterglue_register_rest_routes' );
