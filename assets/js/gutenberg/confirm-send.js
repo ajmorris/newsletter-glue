@@ -60,80 +60,125 @@
 			}
 		}, [] );
 
-		// Check if "Send as newsletter" is checked.
-		useEffect( () => {
-			const checkSendStatus = () => {
-				if ( typeof jQuery !== 'undefined' ) {
-					const checked = jQuery( '#ngl_send_newsletter' ).is( ':checked' ) || jQuery( '#ngl_send_newsletter2' ).is( ':checked' );
-					setSendChecked( checked );
-					
-					if ( checked ) {
-						// Get newsletter data.
-						const data = {
-							subject: '',
-							audience: '',
-							audienceName: '',
-							segment: '',
-							app: '',
-							appName: '',
-						};
+	// Check if "Send as newsletter" is checked.
+	useEffect( () => {
+		const checkSendStatus = () => {
+			let checked = false;
+			let metaData = {};
 
-						// Try to get from localized script.
-						if ( typeof newsletterglueConfirm !== 'undefined' ) {
-							data.subject = newsletterglueConfirm.subject || '';
-							data.audience = newsletterglueConfirm.audience || '';
-							data.audienceName = newsletterglueConfirm.audienceName || '';
-							data.segment = newsletterglueConfirm.segment || '';
-							data.app = newsletterglueConfirm.app || '';
-							data.appName = newsletterglueConfirm.appName || '';
-						}
-
-						// Fallback: get from metabox fields.
-						if ( typeof jQuery !== 'undefined' ) {
-							if ( ! data.subject ) {
-								const subjectField = jQuery( '#ngl_subject' );
-								if ( subjectField.length ) {
-									data.subject = subjectField.val() || '';
-								}
-							}
-
-							if ( ! data.audience ) {
-								const audienceField = jQuery( '#ngl_audience' );
-								if ( audienceField.length ) {
-									data.audience = audienceField.val() || '';
-									const selectedOption = audienceField.find( 'option:selected' );
-									if ( selectedOption.length ) {
-										data.audienceName = selectedOption.text() || data.audience;
-									}
-								}
-							}
-
-							if ( ! data.segment ) {
-								const segmentField = jQuery( '#ngl_segment' );
-								if ( segmentField.length ) {
-									const segmentValue = segmentField.val();
-									if ( segmentValue && segmentValue !== '_everyone' ) {
-										const selectedOption = segmentField.find( 'option:selected' );
-										data.segment = selectedOption.length ? selectedOption.text() : segmentValue;
-									}
-								}
-							}
-						}
-
-						// Fallback to post title if no subject.
-						if ( ! data.subject ) {
-							try {
-								const title = wp.data.select( 'core/editor' ).getEditedPostAttribute( 'title' );
-								data.subject = title || '';
-							} catch ( e ) {
-								// Silent fallback.
-							}
-						}
-
-						setNewsletterData( data );
+			// First, try to get from REST API meta (for panel mode).
+			try {
+				if ( typeof wp !== 'undefined' && wp.data && wp.data.select ) {
+					const meta = wp.data.select( 'core/editor' ).getEditedPostAttribute( 'meta' );
+					if ( meta && meta._newsletterglue ) {
+						metaData = meta._newsletterglue;
+						// Check if send_newsletter is enabled.
+						checked = metaData.send_newsletter === '1' || metaData.send_newsletter === 1;
 					}
 				}
-			};
+			} catch ( e ) {
+				// Silent fallback.
+			}
+
+			// Fallback: Check metabox checkboxes (for metabox mode).
+			if ( ! checked && typeof jQuery !== 'undefined' ) {
+				checked = jQuery( '#ngl_send_newsletter' ).is( ':checked' ) || jQuery( '#ngl_send_newsletter2' ).is( ':checked' );
+			}
+
+			setSendChecked( checked );
+			
+			if ( checked ) {
+				// Get newsletter data.
+				const data = {
+					subject: '',
+					audience: '',
+					audienceName: '',
+					segment: '',
+					app: '',
+					appName: '',
+				};
+
+				// Try to get from localized script.
+				if ( typeof newsletterglueConfirm !== 'undefined' ) {
+					data.subject = newsletterglueConfirm.subject || '';
+					data.audience = newsletterglueConfirm.audience || '';
+					data.audienceName = newsletterglueConfirm.audienceName || '';
+					data.segment = newsletterglueConfirm.segment || '';
+					data.app = newsletterglueConfirm.app || '';
+					data.appName = newsletterglueConfirm.appName || '';
+				}
+
+				// Try to get from REST API meta (panel mode).
+				if ( metaData && Object.keys( metaData ).length > 0 ) {
+					if ( ! data.subject && metaData.subject ) {
+						data.subject = metaData.subject;
+					}
+					if ( ! data.audience && metaData.audience ) {
+						data.audience = metaData.audience;
+					}
+					if ( ! data.audienceName && metaData.audienceName ) {
+						data.audienceName = metaData.audienceName;
+					}
+					if ( ! data.segment && metaData.segment && metaData.segment !== '_everyone' ) {
+						data.segment = metaData.segment;
+					}
+					// Also get segment name if available.
+					if ( metaData.segmentName ) {
+						data.segment = metaData.segmentName;
+					}
+					if ( ! data.app && metaData.app ) {
+						data.app = metaData.app;
+					}
+					if ( ! data.appName && metaData.appName ) {
+						data.appName = metaData.appName;
+					}
+				}
+
+				// Fallback: get from metabox fields (metabox mode).
+				if ( typeof jQuery !== 'undefined' ) {
+					if ( ! data.subject ) {
+						const subjectField = jQuery( '#ngl_subject' );
+						if ( subjectField.length ) {
+							data.subject = subjectField.val() || '';
+						}
+					}
+
+					if ( ! data.audience ) {
+						const audienceField = jQuery( '#ngl_audience' );
+						if ( audienceField.length ) {
+							data.audience = audienceField.val() || '';
+							const selectedOption = audienceField.find( 'option:selected' );
+							if ( selectedOption.length ) {
+								data.audienceName = selectedOption.text() || data.audience;
+							}
+						}
+					}
+
+					if ( ! data.segment ) {
+						const segmentField = jQuery( '#ngl_segment' );
+						if ( segmentField.length ) {
+							const segmentValue = segmentField.val();
+							if ( segmentValue && segmentValue !== '_everyone' ) {
+								const selectedOption = segmentField.find( 'option:selected' );
+								data.segment = selectedOption.length ? selectedOption.text() : segmentValue;
+							}
+						}
+					}
+				}
+
+				// Fallback to post title if no subject.
+				if ( ! data.subject ) {
+					try {
+						const title = wp.data.select( 'core/editor' ).getEditedPostAttribute( 'title' );
+						data.subject = title || '';
+					} catch ( e ) {
+						// Silent fallback.
+					}
+				}
+
+				setNewsletterData( data );
+			}
+		};
 
 			// Check immediately.
 			checkSendStatus();
@@ -166,9 +211,26 @@
 			return null;
 		}
 
-		const subject = newsletterData.subject || '';
-		const audienceName = newsletterData.audienceName || newsletterData.audience || __( 'Unknown', 'newsletter-glue' );
-		const segment = newsletterData.segment && newsletterData.segment !== '_everyone' ? newsletterData.segment : '';
+		const subject = newsletterData.subject || __( 'Not set', 'newsletter-glue' );
+		
+		// Get audience name - try multiple sources.
+		let audienceName = '';
+		if ( newsletterData.audienceName ) {
+			audienceName = newsletterData.audienceName;
+		} else if ( newsletterData.audience ) {
+			audienceName = newsletterData.audience;
+		} else {
+			audienceName = __( 'Not set', 'newsletter-glue' );
+		}
+		
+		// Get segment name - prioritize segmentName over segment ID.
+		let segment = '';
+		if ( newsletterData.segmentName ) {
+			segment = newsletterData.segmentName;
+		} else if ( newsletterData.segment && newsletterData.segment !== '_everyone' ) {
+			segment = newsletterData.segment;
+		}
+		
 		const appName = newsletterData.appName || '';
 
 		return el( PluginPrePublishPanel,
@@ -183,7 +245,7 @@
 				),
 				el( 'div', { style: { marginBottom: '12px' } },
 					el( 'strong', { style: { display: 'inline-block', minWidth: '80px' } }, __( 'Subject: ', 'newsletter-glue' ) ),
-					el( 'span', {}, subject || __( '(not set)', 'newsletter-glue' ) )
+					el( 'span', {}, subject )
 				),
 				el( 'div', { style: { marginBottom: '12px' } },
 					el( 'strong', { style: { display: 'inline-block', minWidth: '80px' } }, __( 'Audience: ', 'newsletter-glue' ) ),

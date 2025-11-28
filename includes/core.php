@@ -166,6 +166,208 @@ function newsletterglue_publish_future_post( $post_id ) {
 add_action( 'publish_future_post', 'newsletterglue_publish_future_post' );
 
 /**
+ * Unified function to check and process newsletter sending.
+ * Works for both meta box and panel modes.
+ * 
+ * @param int $post_id Post ID
+ * @param WP_Post $post Post object
+ * @param string $source Source of the call ('metabox' or 'panel')
+ * @return bool|WP_Error True on success, false on failure, WP_Error on error
+ */
+function newsletterglue_process_newsletter_send( $post_id, $post, $source = 'metabox' ) {
+	
+	// Validate inputs.
+	if ( empty( $post_id ) || empty( $post ) ) {
+		return false;
+	}
+	
+	// Don't process for revisions or autosaves.
+	if ( ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) || is_int( wp_is_post_revision( $post ) ) || is_int( wp_is_post_autosave( $post ) ) ) {
+		return false;
+	}
+	
+	// Only allow published and scheduled posts.
+	if ( ! in_array( $post->post_status, array( 'publish', 'future' ) ) ) {
+		return false;
+	}
+	
+	// Check user has permission.
+	if ( ! current_user_can( 'manage_newsletterglue' ) ) {
+		return false;
+	}
+	
+	// Use a transient to prevent duplicate sends.
+	$lock_key = 'ngl_send_lock_' . $post_id . '_' . $source;
+	if ( get_transient( $lock_key ) ) {
+		return false; // Already processing.
+	}
+	set_transient( $lock_key, true, 30 ); // 30 second lock
+	
+	// Get newsletter data based on source.
+	$newsletter_data = array();
+	$send_newsletter = false;
+	$subject = '';
+	
+	if ( $source === 'metabox' ) {
+		// Meta box mode - get from $_POST.
+		if ( empty( $_POST['newsletterglue_meta_nonce'] ) || ! wp_verify_nonce( $_POST['newsletterglue_meta_nonce'], 'newsletterglue_save_data' ) ) {
+			delete_transient( $lock_key );
+			return false;
+		}
+		
+		if ( empty( $_POST['post_ID'] ) || $_POST['post_ID'] != $post_id ) {
+			delete_transient( $lock_key );
+			return false;
+		}
+		
+		// Save newsletter data first.
+		newsletterglue_save_data( $post_id, newsletterglue_sanitize( $_POST ) );
+		
+		// Check if send newsletter is requested.
+		$send_newsletter = isset( $_POST[ 'ngl_send_newsletter' ] ) && $_POST[ 'ngl_send_newsletter' ] == '1' ? true : false;
+		$subject = isset( $_POST[ 'ngl_subject' ] ) ? $_POST[ 'ngl_subject' ] : '';
+		
+		// Get the saved data.
+		$newsletter_data = get_post_meta( $post_id, '_newsletterglue', true );
+		
+	} else {
+		// Panel mode - get from meta.
+		$newsletter_data = get_post_meta( $post_id, '_newsletterglue', true );
+		
+		if ( ! is_array( $newsletter_data ) || empty( $newsletter_data ) ) {
+			delete_transient( $lock_key );
+			return false;
+		}
+		
+		// Check if send newsletter is requested.
+		$send_newsletter = isset( $newsletter_data[ 'send_newsletter' ] ) && ( $newsletter_data[ 'send_newsletter' ] == '1' || $newsletter_data[ 'send_newsletter' ] === 1 );
+		$subject = isset( $newsletter_data[ 'subject' ] ) ? $newsletter_data[ 'subject' ] : '';
+	}
+	
+	// If send newsletter is not requested, exit.
+	if ( ! $send_newsletter ) {
+		delete_transient( $lock_key );
+		return false;
+	}
+	
+	// Ensure we have valid newsletter data.
+	if ( ! is_array( $newsletter_data ) || empty( $newsletter_data ) ) {
+		$newsletter_data = get_post_meta( $post_id, '_newsletterglue', true );
+	}
+	
+	if ( ! is_array( $newsletter_data ) ) {
+		delete_transient( $lock_key );
+		return false;
+	}
+	
+	// Ensure the app is set - critical for sending.
+	$app = newsletterglue_default_connection();
+	if ( ! $app ) {
+		delete_transient( $lock_key );
+		return new WP_Error( 'no_app', __( 'No email service provider connected.', 'newsletter-glue' ) );
+	}
+	
+	// Set app if not already set.
+	if ( ! isset( $newsletter_data[ 'app' ] ) || empty( $newsletter_data[ 'app' ] ) ) {
+		$newsletter_data[ 'app' ] = $app;
+	}
+	
+	// Ensure required fields have defaults if not set.
+	$defaults = array(
+		'add_featured' => 0,
+		'brand' => '',
+		'lists' => '',
+		'groups' => '',
+		'segments' => '',
+		'track_opens' => 0,
+		'track_clicks' => 0,
+		'schedule' => 'immediately',
+	);
+	
+	foreach ( $defaults as $key => $default_value ) {
+		if ( ! isset( $newsletter_data[ $key ] ) ) {
+			$newsletter_data[ $key ] = $default_value;
+		}
+	}
+	
+	// For panel mode, ensure from_email and from_name use defaults if empty.
+	// This matches meta box behavior where defaults are pre-filled in the form.
+	// If fields are empty, we should use the same defaults that the meta box uses.
+	if ( $source === 'panel' ) {
+		// Get default from name if not set or empty - use same function as meta box.
+		if ( empty( $newsletter_data[ 'from_name' ] ) ) {
+			if ( function_exists( 'newsletterglue_get_default_from_name' ) ) {
+				$newsletter_data[ 'from_name' ] = newsletterglue_get_default_from_name();
+			} else {
+				// Fallback to option.
+				$newsletter_data[ 'from_name' ] = newsletterglue_get_option( 'from_name', $app );
+			}
+		}
+		
+		// Get default from email if not set or empty - use same source as meta box.
+		// The meta box uses newsletterglue_get_option('from_email', $app) from defaults.
+		if ( empty( $newsletter_data[ 'from_email' ] ) ) {
+			$newsletter_data[ 'from_email' ] = newsletterglue_get_option( 'from_email', $app );
+			
+			// If still empty, fallback to integration's get_current_user_email().
+			if ( empty( $newsletter_data[ 'from_email' ] ) ) {
+				include_once newsletterglue_get_path( $app ) . '/init.php';
+				$classname = 'NGL_' . ucfirst( $app );
+				if ( class_exists( $classname ) ) {
+					$api_instance = new $classname();
+					if ( method_exists( $api_instance, 'get_current_user_email' ) ) {
+						$newsletter_data[ 'from_email' ] = $api_instance->get_current_user_email();
+					}
+				}
+			}
+		}
+	}
+	
+	// Update the meta with properly formatted data (including defaults for panel mode).
+	update_post_meta( $post_id, '_newsletterglue', $newsletter_data );
+	
+	// Reset the send_newsletter flag to prevent re-sending.
+	// Note: Keep all the default values we just set.
+	$newsletter_data[ 'send_newsletter' ] = '0';
+	update_post_meta( $post_id, '_newsletterglue', $newsletter_data );
+	
+	// Ensure meta is saved and available for newsletterglue_send() to read.
+	// Re-read to ensure we have the latest data with all defaults applied.
+	$newsletter_data = get_post_meta( $post_id, '_newsletterglue', true );
+	
+	// Send the newsletter.
+	$result = false;
+	
+	if ( $post->post_status == 'future' ) {
+		// Schedule newsletter.
+		update_post_meta( $post_id, '_ngl_future_send', 'yes' );
+		
+		$scheduled = array(
+			'status' => 200,
+			'type' => 'schedule',
+			'message' => __( 'Scheduled', 'newsletter-glue' ),
+		);
+		
+		newsletterglue_add_campaign_data( $post_id, $subject, $scheduled, 0 );
+		$result = true;
+		
+	} else {
+		// Send immediately.
+		$result = newsletterglue_send( $post_id );
+	}
+	
+	// We did an action here.
+	if ( ! get_option( 'newsletterglue_did_action' ) ) {
+		update_option( 'newsletterglue_did_action', 'yes' );
+	}
+	
+	// Clean up lock.
+	delete_transient( $lock_key );
+	
+	return $result;
+}
+
+/**
  * Send the newsletter and mark as sent.
  */
 function newsletterglue_send( $post_id = 0, $test = false ) {

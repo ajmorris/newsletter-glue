@@ -1,0 +1,65 @@
+/**
+ * Newsletter Glue Panel Styles
+ */
+
+.newsletterglue-panel .components-panel__body {
+	border: none !important;
+}
+
+.newsletterglue-panel .components-base-control {
+	margin-bottom: 16px;
+}
+
+.newsletterglue-panel .components-base-control__label {
+	font-weight: 600;
+	margin-bottom: 8px;
+	display: block;
+}
+
+.newsletterglue-panel .components-text-control__input,
+.newsletterglue-panel .components-select-control__input {
+	width: 100%;
+}
+
+.newsletterglue-panel .components-panel__row {
+	margin-bottom: 16px;
+}
+
+.newsletterglue-panel .components-notice {
+	margin: 16px 0 !important;
+	padding: 8px 12px !important;
+}
+
+.newsletterglue-panel .components-spinner {
+	margin: 0 auto;
+	display: block;
+}
+
+.newsletterglue-panel hr {
+	border: none;
+	border-top: 1px solid #e0e0e0;
+	margin: 16px 0;
+}
+
+.newsletterglue-panel .components-toggle-control {
+	margin-bottom: 0;
+}
+
+.newsletterglue-panel .components-base-control__help {
+	margin-top: 8px;
+	margin-bottom: 0;
+	font-size: 12px;
+	font-style: normal;
+	color: #757575;
+}
+
+/* Loading state */
+.newsletterglue-panel .components-spinner {
+	float: none;
+}
+
+/* Panel header styling */
+.edit-post-sidebar .components-panel__body.is-opened .newsletterglue-panel {
+	padding: 16px;
+}
+

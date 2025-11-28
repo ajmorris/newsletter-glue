@@ -212,7 +212,10 @@ function newsletterglue_add_campaign_data( $post_id, $subject = '', $result = ''
 			$result[ 'post_id' ] = $post_id;
 			$result[ 'time' ]    = $time;
 
-			newsletterglue_add_notice( $result );
+			// Only add notice if function exists (admin context).
+			if ( function_exists( 'newsletterglue_add_notice' ) ) {
+				newsletterglue_add_notice( $result );
+			}
 
 		}
 
