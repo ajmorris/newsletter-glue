@@ -35,6 +35,8 @@
 		const [ newsletterData, setNewsletterData ] = useState( {} );
 		const [ sendChecked, setSendChecked ] = useState( false );
 		const [ PluginPrePublishPanel, setPluginPrePublishPanel ] = useState( null );
+		const [ isSubjectEmpty, setIsSubjectEmpty ] = useState( false );
+		const [ fallbackSubject, setFallbackSubject ] = useState( '' );
 
 		// Wait for PluginPrePublishPanel to be available.
 		useEffect( () => {
@@ -179,14 +181,25 @@
 					}
 				}
 
-				// Fallback to post title if no subject.
-				if ( ! data.subject ) {
+				// Track if subject is actually empty and get fallback.
+				const hasSubject = data.subject && data.subject.trim() !== '';
+				setIsSubjectEmpty( ! hasSubject );
+				
+				// Get fallback post title if subject is empty.
+				let fallbackTitle = '';
+				if ( ! hasSubject ) {
 					try {
 						const title = wp.data.select( 'core/editor' ).getEditedPostAttribute( 'title' );
-						data.subject = title || '';
+						fallbackTitle = title || '';
+						setFallbackSubject( fallbackTitle );
+						// Set subject for display purposes (but we know it's a fallback).
+						data.subject = fallbackTitle || '';
 					} catch ( e ) {
 						// Silent fallback.
+						setFallbackSubject( '' );
 					}
+				} else {
+					setFallbackSubject( '' );
 				}
 
 				setNewsletterData( data );
@@ -239,7 +252,18 @@
 			return null;
 		}
 
-		const subject = newsletterData.subject || __( 'Not set', 'newsletter-glue' );
+		// Determine subject display - show fallback if empty, with clear indication.
+		let subjectDisplay = '';
+		if ( isSubjectEmpty && fallbackSubject ) {
+			// Subject is empty, using post title as fallback.
+			subjectDisplay = fallbackSubject;
+		} else if ( newsletterData.subject ) {
+			// Subject is set.
+			subjectDisplay = newsletterData.subject;
+		} else {
+			// No subject and no fallback available.
+			subjectDisplay = __( 'Not set', 'newsletter-glue' );
+		}
 		
 		// Get audience name - try multiple sources.
 		let audienceName = '';
@@ -303,7 +327,12 @@
 				),
 				el( 'div', { style: { marginBottom: '12px' } },
 					el( 'strong', { style: { display: 'inline-block', minWidth: '80px' } }, __( 'Subject: ', 'newsletter-glue' ) ),
-					el( 'span', {}, subject )
+					isSubjectEmpty && fallbackSubject ? el( Fragment, {},
+						el( 'span', { style: { fontStyle: 'italic', color: '#757575' } }, subjectDisplay ),
+						el( 'span', { style: { fontSize: '12px', color: '#d63638', marginLeft: '8px' } }, 
+							__( '(using post title - subject field is empty)', 'newsletter-glue' )
+						)
+					) : el( 'span', {}, subjectDisplay )
 				),
 				el( 'div', { style: { marginBottom: '12px' } },
 					el( 'strong', { style: { display: 'inline-block', minWidth: '80px' } }, __( 'Audience: ', 'newsletter-glue' ) ),

@@ -56,6 +56,7 @@ function NewsletterGluePanel() {
 	const [ testResult, setTestResult ] = useState( null );
 	const [ testEmailByWordPress, setTestEmailByWordPress ] = useState( false );
 	const [ appName, setAppName ] = useState( '' );
+	const [ subjectError, setSubjectError ] = useState( false );
 
 	// Get newsletter data from meta.
 	const newsletterData = meta._newsletterglue || {};
@@ -161,6 +162,23 @@ function NewsletterGluePanel() {
 		}
 	}, [ selectedAudience ] );
 
+	// Validate subject field.
+	const validateSubject = ( subjectValue, sendNewsletter ) => {
+		const sendChecked = sendNewsletter === '1' || sendNewsletter === 1 || 
+			( sendNewsletter === undefined && ( newsletterData.send_newsletter === '1' || newsletterData.send_newsletter === 1 ) );
+		const isEmpty = ! subjectValue || subjectValue.trim() === '';
+		
+		// Show error if send is checked and subject is empty.
+		setSubjectError( sendChecked && isEmpty );
+	};
+	
+	// Validate subject when send_newsletter or subject changes.
+	useEffect( () => {
+		const subject = newsletterData.subject || defaults.subject || '';
+		const sendChecked = newsletterData.send_newsletter === '1' || newsletterData.send_newsletter === 1;
+		validateSubject( subject, sendChecked ? '1' : '0' );
+	}, [ newsletterData.send_newsletter, newsletterData.subject ] );
+
 	// Helper function to update newsletter meta.
 	const updateNewsletterMeta = ( key, value ) => {
 		const updatedData = { 
@@ -169,6 +187,11 @@ function NewsletterGluePanel() {
 			app: app // Always store the app name.
 		};
 		editPost( { meta: { _newsletterglue: updatedData } } );
+		
+		// Validate subject if it's being updated and send_newsletter is checked.
+		if ( key === 'subject' ) {
+			validateSubject( value, updatedData.send_newsletter );
+		}
 	};
 
 	// Handle audience change.
@@ -360,12 +383,19 @@ function NewsletterGluePanel() {
 			className: 'newsletterglue-panel',
 		},
 		
+		// Subject line error notice.
+		subjectError && el( Notice, {
+			status: 'error',
+			isDismissible: false,
+		}, 'Subject is required when sending as newsletter.' ),
+		
 		// Subject line.
 		el( TextControl, {
 			label: 'Subject',
 			value: newsletterData.subject || defaults.subject || '',
 			onChange: ( value ) => updateNewsletterMeta( 'subject', value ),
-			help: 'Short, catchy subject lines get more opens.',
+			help: subjectError ? 'This field is required.' : 'Short, catchy subject lines get more opens.',
+			className: subjectError ? 'has-error' : '',
 		} ),
 
 		// Preview text.
@@ -494,7 +524,12 @@ function NewsletterGluePanel() {
 			el( ToggleControl, {
 				label: 'Send as newsletter',
 				checked: newsletterData.send_newsletter === '1' || newsletterData.send_newsletter === 1,
-				onChange: ( value ) => updateNewsletterMeta( 'send_newsletter', value ? '1' : '0' ),
+				onChange: ( value ) => {
+					updateNewsletterMeta( 'send_newsletter', value ? '1' : '0' );
+					// Validate subject when toggling send_newsletter.
+					const subject = newsletterData.subject || defaults.subject || '';
+					validateSubject( subject, value ? '1' : '0' );
+				},
 				help: 'Send this post as a newsletter when published/updated.',
 			} )
 		),
