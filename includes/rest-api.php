@@ -301,6 +301,31 @@ function newsletterglue_rest_send_test_email( $request ) {
 }
 
 /**
+ * Reset a sent newsletter (REST API endpoint).
+ */
+function newsletterglue_rest_reset_newsletter( $request ) {
+	$post_id = $request->get_param( 'post_id' );
+
+	if ( ! $post_id ) {
+		return new WP_Error( 'rest_invalid_post_id', esc_html__( 'Invalid post ID.', 'newsletter-glue' ), array( 'status' => 400 ) );
+	}
+
+	// Check if post exists.
+	$post = get_post( $post_id );
+	if ( ! $post ) {
+		return new WP_Error( 'rest_post_not_found', esc_html__( 'Post not found.', 'newsletter-glue' ), array( 'status' => 404 ) );
+	}
+
+	// Reset the newsletter.
+	newsletterglue_reset_newsletter( $post_id );
+
+	return new WP_REST_Response( array(
+		'success' => true,
+		'message' => __( 'Newsletter reset successfully.', 'newsletter-glue' ),
+	), 200 );
+}
+
+/**
  * Register REST routes.
  */
 function newsletterglue_register_rest_routes() {
@@ -347,6 +372,23 @@ function newsletterglue_register_rest_routes() {
 				'type' => 'string',
 				'validate_callback' => function( $param ) {
 					return is_email( $param );
+				},
+			),
+		),
+	) );
+
+	register_rest_route( 'newsletterglue/v1', '/reset-newsletter', array(
+		'methods'  => 'POST',
+		'callback' => 'newsletterglue_rest_reset_newsletter',
+		'permission_callback' => function() {
+			return current_user_can( 'manage_newsletterglue' );
+		},
+		'args' => array(
+			'post_id' => array(
+				'required' => true,
+				'type' => 'integer',
+				'validate_callback' => function( $param ) {
+					return is_numeric( $param ) && $param > 0;
 				},
 			),
 		),
