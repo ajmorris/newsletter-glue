@@ -58,6 +58,9 @@ function NewsletterGluePanel() {
 	const [ appName, setAppName ] = useState( '' );
 	const [ subjectError, setSubjectError ] = useState( false );
 	const [ isResetting, setIsResetting ] = useState( false );
+	const [ audienceLabel, setAudienceLabel ] = useState( 'Audience' );
+	const [ segmentLabel, setSegmentLabel ] = useState( 'Segment / tag' );
+	const [ createTagUrl, setCreateTagUrl ] = useState( '' );
 
 	// Get newsletter data from meta.
 	const newsletterData = meta._newsletterglue || {};
@@ -85,6 +88,9 @@ function NewsletterGluePanel() {
 				setDefaults( response.defaults || {} );
 				setAudiences( response.audiences || {} );
 				setTestEmailByWordPress( response.testEmailByWordPress || false );
+				setAudienceLabel( response.audienceLabel || 'Audience' );
+				setSegmentLabel( response.segmentLabel || 'Segment / tag' );
+				setCreateTagUrl( response.createTagUrl || '' );
 				
 				// Set initial audience value - check multiple sources.
 				let initialAudience = '';
@@ -467,7 +473,7 @@ function NewsletterGluePanel() {
 
 		// Audience selector.
 		audienceOptions.length > 0 && el( SelectControl, {
-			label: 'Audience',
+			label: audienceLabel,
 			value: newsletterData.audience || selectedAudience || '',
 			options: audienceOptions,
 			onChange: handleAudienceChange,
@@ -476,8 +482,11 @@ function NewsletterGluePanel() {
 
 		// Segment selector.
 		selectedAudience && el( BaseControl, {
-			label: 'Segment / tag',
-			help: isLoadingSegments ? 'Loading segments...' : 'A specific group of subscribers.',
+			label: segmentLabel,
+			help: isLoadingSegments ? 'Loading segments...' : ( createTagUrl ? el( Fragment, {}, 
+				'A specific group of subscribers. ',
+				el( 'a', { href: createTagUrl, target: '_blank', rel: 'noopener noreferrer' }, 'Create ' + segmentLabel.toLowerCase() )
+			) : 'A specific group of subscribers.' ),
 		},
 			isLoadingSegments ? el( Spinner ) : (
 				segmentOptions.length > 0 ? el( SelectControl, {

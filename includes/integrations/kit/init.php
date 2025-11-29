@@ -346,22 +346,44 @@ class NGL_Kit extends NGL_Abstract_Integration {
 		// Generate email HTML content.
 		$html_content = newsletterglue_generate_content( $post, $subject, $this->app );
 
-		// Create broadcast.
+		// Create broadcast data for Kit API v4.
 		$broadcast_data = array(
-			'email_address' => $from_email,
-			'name'          => $from_name,
-			'subject'       => $subject,
-			'content'       => $html_content,
+			'subject'      => $subject,
+			'content'      => $html_content,
+			'description'  => sprintf( __( 'Newsletter: %s', 'newsletter-glue' ), $subject ),
+			'public'       => false,
 		);
 
-		// Add form (audience) if specified.
-		if ( $audience ) {
-			$broadcast_data['form_id'] = $audience;
+		// Add preview_text if available (optional field)
+		$preview_text = get_post_meta( $post_id, '_newsletterglue_preview_text', true );
+		if ( ! empty( $preview_text ) ) {
+			$broadcast_data['preview_text'] = $preview_text;
 		}
 
-		// Add tag (segment) if specified.
+		// Set send_at based on test vs actual send.
+		if ( $test ) {
+			// For test emails, keep as draft (null send_at)
+			$broadcast_data['send_at'] = null;
+		} elseif ( $schedule === 'immediately' ) {
+			// Send immediately - set to current time
+			$broadcast_data['send_at'] = gmdate( 'c' );
+		} else {
+			// Scheduled send - keep as draft for now (scheduling will be handled separately)
+			$broadcast_data['send_at'] = null;
+		}
+
+		// Note: email_address is not sent to Kit API - Kit uses account default
+		// The from_email is stored in options for wp_mail fallback only
+		
+		// Add tag (segment) if specified - this is what Kit uses for targeting
+		// Forms are for audience selection but targeting is done via tags
 		if ( $segment ) {
 			$broadcast_data['tag_id'] = $segment;
+		}
+
+		// Debug: Log broadcast data
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( 'NGL_Kit send_newsletter: Broadcast data (test=' . ( $test ? 'true' : 'false' ) . '): ' . print_r( $broadcast_data, true ) );
 		}
 
 		$broadcast = $this->api->create_broadcast( $broadcast_data );
@@ -391,17 +413,65 @@ class NGL_Kit extends NGL_Abstract_Integration {
 		// Handle test email.
 		if ( $test ) {
 
+			// Debug: Log test email attempt
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'NGL_Kit send_newsletter: Sending test email to: ' . $data['test_email'] . ' (broadcast_id: ' . $broadcast_id . ')' );
+			}
+
+			// Try to send test email via Kit API test endpoint
 			$test_result = $this->api->send_test( $broadcast_id, $data['test_email'] );
 
-			// Delete test broadcast.
+			// Debug: Log test result
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'NGL_Kit send_newsletter: Test email result: ' . print_r( $test_result, true ) );
+			}
+
+			// Check if test endpoint exists and worked
+			$test_failed = false;
+			if ( isset( $test_result[ 'error' ] ) || 
+			     ( isset( $test_result[ 'status' ] ) && is_numeric( $test_result[ 'status' ] ) && $test_result[ 'status' ] >= 400 ) ||
+			     ( isset( $test_result[ 'errors' ] ) && ! empty( $test_result[ 'errors' ] ) ) ) {
+				$test_failed = true;
+			}
+
+			// If test endpoint doesn't exist (404) or failed, try alternative: create a temporary broadcast with test email as subscriber
+			if ( $test_failed || ( isset( $test_result[ 'status' ] ) && $test_result[ 'status' ] == 404 ) ) {
+				
+				// Alternative approach: Use wp_mail as fallback (like Sendy, GetResponse, etc.)
+				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+					error_log( 'NGL_Kit send_newsletter: Test endpoint failed or not available, using wp_mail fallback' );
+				}
+
+				// Use WordPress wp_mail to send test email with configured from_name and from_email
+				add_filter( 'wp_mail_content_type', array( $this, 'wp_mail_content_type' ) );
+				add_filter( 'wp_mail_from', array( $this, 'wp_mail_from' ) );
+				add_filter( 'wp_mail_from_name', array( $this, 'wp_mail_from_name' ) );
+				
+				$test_subject = sprintf( __( '[Test] %s', 'newsletter-glue' ), $subject );
+				$test_body = $html_content;
+				
+				$wp_mail_result = wp_mail( $data['test_email'], $test_subject, $test_body );
+				
+				remove_filter( 'wp_mail_content_type', array( $this, 'wp_mail_content_type' ) );
+				remove_filter( 'wp_mail_from', array( $this, 'wp_mail_from' ) );
+				remove_filter( 'wp_mail_from_name', array( $this, 'wp_mail_from_name' ) );
+
+				// Delete test broadcast.
+				$this->api->delete_broadcast( $broadcast_id );
+
+				delete_transient( $lock_key );
+
+				if ( ! $wp_mail_result ) {
+					return array( 'fail' => __( 'Failed to send test email via WordPress mail', 'newsletter-glue' ) );
+				}
+
+				return array( 'success' => $this->get_test_success_msg() );
+			}
+
+			// Test endpoint worked - delete broadcast and return success
 			$this->api->delete_broadcast( $broadcast_id );
 
 			delete_transient( $lock_key );
-
-			if ( isset( $test_result[ 'error' ] ) || ( isset( $test_result[ 'status' ] ) && $test_result[ 'status' ] != 200 ) ) {
-				$error_msg = isset( $test_result[ 'message' ] ) ? $test_result[ 'message' ] : __( 'Failed to send test email', 'newsletter-glue' );
-				return array( 'fail' => $error_msg );
-			}
 
 			return array( 'success' => $this->get_test_success_msg() );
 
@@ -532,6 +602,64 @@ class NGL_Kit extends NGL_Abstract_Integration {
 	public function _get_lists_compat() {
 		$this->api = new NGL_Kit_API( $this->api_key );
 		return $this->get_audiences();
+	}
+
+	/**
+	 * Get audience label (Form for Kit).
+	 */
+	public function get_audience_label() {
+		return __( 'Form', 'newsletter-glue' );
+	}
+
+	/**
+	 * Get segment label (Tag for Kit).
+	 */
+	public function get_segment_label() {
+		return __( 'Tag', 'newsletter-glue' );
+	}
+
+	/**
+	 * Get create tag link URL.
+	 */
+	public function get_create_tag_url() {
+		return 'https://app.kit.com/subscribers';
+	}
+
+	/**
+	 * Set email content type to HTML for wp_mail.
+	 */
+	public function wp_mail_content_type() {
+		return 'text/html';
+	}
+
+	/**
+	 * Set from email address for wp_mail.
+	 */
+	public function wp_mail_from( $from_email ) {
+		$options = get_option( 'newsletterglue_options' );
+		$kit_options = isset( $options[ $this->app ] ) ? $options[ $this->app ] : array();
+		$configured_email = isset( $kit_options['from_email'] ) ? $kit_options['from_email'] : '';
+		
+		if ( ! empty( $configured_email ) && is_email( $configured_email ) ) {
+			return $configured_email;
+		}
+		
+		return $from_email;
+	}
+
+	/**
+	 * Set from name for wp_mail.
+	 */
+	public function wp_mail_from_name( $from_name ) {
+		$options = get_option( 'newsletterglue_options' );
+		$kit_options = isset( $options[ $this->app ] ) ? $options[ $this->app ] : array();
+		$configured_name = isset( $kit_options['from_name'] ) ? $kit_options['from_name'] : '';
+		
+		if ( ! empty( $configured_name ) ) {
+			return $configured_name;
+		}
+		
+		return $from_name;
 	}
 
 }

@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 	<div class="ngl-metabox-flex">
 		<div class="ngl-metabox-header">
-			<label for="ngl_audience"><?php esc_html_e( 'Form', 'newsletter-glue' ); ?></label>
+			<label for="ngl_audience"><?php echo esc_html( $api->get_audience_label() ); ?></label>
 		</div>
 		<div class="ngl-field">
 			<?php
@@ -46,7 +46,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 	<div class="ngl-metabox-flex ngl-metabox-segment">
 		<div class="ngl-metabox-header">
-			<label for="ngl_segment"><?php esc_html_e( 'Tag', 'newsletter-glue' ); ?></label>
+			<label for="ngl_segment"><?php echo esc_html( $api->get_segment_label() ); ?></label>
 			<?php echo $api->show_loading(); ?>
 		</div>
 		<div class="ngl-field">
@@ -62,7 +62,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 				newsletterglue_select_field( array(
 					'id' 			=> 'ngl_segment',
 					'legacy'		=> true,
-					'helper'		=> sprintf( __( 'A specific group of subscribers. %s', 'newsletter-glue' ), '<a href="https://app.kit.com/subscribers/tags" target="_blank">' . __( 'Create tag', 'newsletter-glue' ) . ' <i class="arrow right icon"></i></a>' ),
+					'helper'		=> sprintf( __( 'A specific group of subscribers. %s', 'newsletter-glue' ), '<a href="' . esc_url( $api->get_create_tag_url() ) . '" target="_blank">' . sprintf( __( 'Create %s', 'newsletter-glue' ), strtolower( $api->get_segment_label() ) ) . ' <i class="arrow right icon"></i></a>' ),
 					'options'		=> $audience ? $api->get_segments( $audience ) : '',
 					'default'		=> $segment,
 				) );

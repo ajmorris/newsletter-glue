@@ -37,6 +37,8 @@
 		const [ PluginPrePublishPanel, setPluginPrePublishPanel ] = useState( null );
 		const [ isSubjectEmpty, setIsSubjectEmpty ] = useState( false );
 		const [ fallbackSubject, setFallbackSubject ] = useState( '' );
+		const [ audienceLabel, setAudienceLabel ] = useState( __( 'Audience', 'newsletter-glue' ) );
+		const [ segmentLabel, setSegmentLabel ] = useState( __( 'Segment', 'newsletter-glue' ) );
 
 		// Wait for PluginPrePublishPanel to be available.
 		useEffect( () => {
@@ -111,6 +113,13 @@
 					data.segment = newsletterglueConfirm.segment || '';
 					data.app = newsletterglueConfirm.app || '';
 					data.appName = newsletterglueConfirm.appName || '';
+					// Get labels from localized script.
+					if ( newsletterglueConfirm.audienceLabel ) {
+						setAudienceLabel( newsletterglueConfirm.audienceLabel );
+					}
+					if ( newsletterglueConfirm.segmentLabel ) {
+						setSegmentLabel( newsletterglueConfirm.segmentLabel );
+					}
 				}
 
 				// Try to get from REST API meta (panel mode).
@@ -146,6 +155,29 @@
 					}
 					if ( ! data.appName && metaData.appName ) {
 						data.appName = metaData.appName;
+					}
+				}
+				
+				// Try to fetch labels from REST API if in panel mode.
+				if ( typeof wp !== 'undefined' && wp.apiFetch && wp.data && wp.data.select ) {
+					try {
+						const postId = wp.data.select( 'core/editor' ).getCurrentPostId();
+						if ( postId ) {
+							wp.apiFetch( { path: `/newsletterglue/v1/defaults/${postId}` } )
+								.then( ( response ) => {
+									if ( response.audienceLabel ) {
+										setAudienceLabel( response.audienceLabel );
+									}
+									if ( response.segmentLabel ) {
+										setSegmentLabel( response.segmentLabel );
+									}
+								} )
+								.catch( () => {
+									// Silent fail - use defaults from localized script.
+								} );
+						}
+					} catch ( e ) {
+						// Silent fail - use defaults from localized script.
 					}
 				}
 
@@ -335,12 +367,12 @@
 					) : el( 'span', {}, subjectDisplay )
 				),
 				el( 'div', { style: { marginBottom: '12px' } },
-					el( 'strong', { style: { display: 'inline-block', minWidth: '80px' } }, __( 'Audience: ', 'newsletter-glue' ) ),
+					el( 'strong', { style: { display: 'inline-block', minWidth: '80px' } }, audienceLabel + ': ' ),
 					el( 'span', {}, audienceName )
 				),
 				// Always show segment field for clarity.
 				el( 'div', { style: { marginBottom: '12px' } },
-					el( 'strong', { style: { display: 'inline-block', minWidth: '80px' } }, __( 'Segment: ', 'newsletter-glue' ) ),
+					el( 'strong', { style: { display: 'inline-block', minWidth: '80px' } }, segmentLabel + ': ' ),
 					el( 'span', {}, segmentDisplay )
 				),
 				appName && el( 'div', { style: { marginBottom: '12px' } },

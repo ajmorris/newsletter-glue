@@ -147,22 +147,51 @@ class NGL_Kit_API {
 	 * @return array Broadcast response
 	 */
 	public function create_broadcast( $data ) {
+		// Kit API v4 broadcast format based on: https://developers.kit.com/api-reference/broadcasts/create-a-broadcast
 		$broadcast_data = array(
-			'email_address' => isset( $data['email_address'] ) ? $data['email_address'] : '',
-			'name'          => isset( $data['name'] ) ? $data['name'] : '',
 			'subject'       => isset( $data['subject'] ) ? $data['subject'] : '',
 			'content'       => isset( $data['content'] ) ? $data['content'] : '',
+			'description'  => isset( $data['description'] ) ? $data['description'] : '',
+			'public'        => isset( $data['public'] ) ? $data['public'] : false,
+			'published_at'  => isset( $data['published_at'] ) ? $data['published_at'] : gmdate( 'c' ),
+			'preview_text'  => isset( $data['preview_text'] ) ? $data['preview_text'] : '',
+			'send_at'       => isset( $data['send_at'] ) ? $data['send_at'] : null, // null = draft, timestamp = schedule
 		);
 
-		// Add form_id if specified (for audience targeting).
-		if ( isset( $data['form_id'] ) && ! empty( $data['form_id'] ) ) {
-			$broadcast_data['form_id'] = intval( $data['form_id'] );
+		// Note: email_address is not included here - Kit uses the account's default sending email
+		// If a specific email is needed, it should be configured in Kit account settings
+		
+		// Add email_template_id if specified
+		if ( isset( $data['email_template_id'] ) && ! empty( $data['email_template_id'] ) ) {
+			$broadcast_data['email_template_id'] = intval( $data['email_template_id'] );
 		}
 
-		// Add tag_id if specified (for segment targeting).
+		// Build subscriber_filter for segment/tag targeting
+		// Note: Kit API only supports 'segment' or 'tag' types in subscriber_filter, not 'form'
+		// Forms are used for audience selection but targeting is done via tags/segments
+		$subscriber_filter = array();
+		
+		// Add tag (segment) targeting via subscriber_filter
+		// Kit API uses 'segment' type for tags
 		if ( isset( $data['tag_id'] ) && ! empty( $data['tag_id'] ) ) {
-			$broadcast_data['tag_id'] = intval( $data['tag_id'] );
+			$subscriber_filter[] = array(
+				'all' => array(
+					array(
+						'type' => 'segment',
+						'ids'  => array( intval( $data['tag_id'] ) ),
+					),
+				),
+				'any' => null,
+				'none' => null,
+			);
 		}
+
+		// If no filter specified, default to all subscribers (empty filter)
+		if ( empty( $subscriber_filter ) ) {
+			$subscriber_filter = array();
+		}
+
+		$broadcast_data['subscriber_filter'] = $subscriber_filter;
 
 		return $this->request( 'broadcasts', 'POST', $broadcast_data );
 	}
@@ -185,9 +214,15 @@ class NGL_Kit_API {
 	 * @return array Test send response
 	 */
 	public function send_test( $broadcast_id, $email ) {
-		return $this->request( 'broadcasts/' . intval( $broadcast_id ) . '/test', 'POST', array(
+		// Kit API v4 - check if test endpoint exists, otherwise use alternative method
+		// Try the test endpoint first
+		$result = $this->request( 'broadcasts/' . intval( $broadcast_id ) . '/test', 'POST', array(
 			'email' => $email,
 		) );
+		
+		// If test endpoint doesn't exist (404), we might need to use a different approach
+		// For now, return the result and let the calling code handle it
+		return $result;
 	}
 
 	/**

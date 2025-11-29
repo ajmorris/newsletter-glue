@@ -1882,8 +1882,8 @@ function newsletterglue_add_logo() {
 	$id 			= get_option( 'newsletterglue_logo_id' );
 	$logo 			= wp_get_attachment_url( $id );
 	$data  			= wp_get_attachment_image_src( $id, 'full' );
-	$width 			= $data[1];
-	$height 		= $data[2];
+	$width 			= isset( $data[1] ) ? $data[1] : '';
+	$height 		= isset( $data[2] ) ? $data[2] : '';
 	$logo_url		= get_option( 'newsletterglue_logo_url' );
 	$logo_position 	= get_option( 'newsletterglue_position_logo' );
 

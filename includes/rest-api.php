@@ -119,6 +119,11 @@ function newsletterglue_rest_get_defaults( $request ) {
 		$test_email_by_wordpress = $api->test_email_by_wordpress();
 	}
 
+	// Get labels for audience and segment (for abstraction).
+	$audience_label = method_exists( $api, 'get_audience_label' ) ? $api->get_audience_label() : __( 'Audience', 'newsletter-glue' );
+	$segment_label = method_exists( $api, 'get_segment_label' ) ? $api->get_segment_label() : __( 'Segment / tag', 'newsletter-glue' );
+	$create_tag_url = method_exists( $api, 'get_create_tag_url' ) ? $api->get_create_tag_url() : '';
+
 	return array(
 		'connected' => true,
 		'app' => $app,
@@ -129,6 +134,9 @@ function newsletterglue_rest_get_defaults( $request ) {
 		'audiences' => $audiences,
 		'current_audience' => $current_audience,
 		'segments' => array(),
+		'audienceLabel' => $audience_label,
+		'segmentLabel' => $segment_label,
+		'createTagUrl' => $create_tag_url,
 	);
 }
 

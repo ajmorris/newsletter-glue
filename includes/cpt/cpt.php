@@ -990,7 +990,33 @@ class NGL_CPT {
 					} else {
 						$newsletter_data['audienceName'] = $newsletter_data['audience'];
 					}
+					
+					// Get labels for audience and segment (for abstraction).
+					$newsletter_data['audienceLabel'] = method_exists( $api, 'get_audience_label' ) ? $api->get_audience_label() : __( 'Audience', 'newsletter-glue' );
+					$newsletter_data['segmentLabel'] = method_exists( $api, 'get_segment_label' ) ? $api->get_segment_label() : __( 'Segment', 'newsletter-glue' );
+				} else if ( $app ) {
+					// App is connected but no audience selected - still get labels.
+					include_once newsletterglue_get_path( $app ) . '/init.php';
+					$classname = 'NGL_' . ucfirst( $app );
+					$api = new $classname();
+					
+					// Connect the API first.
+					if ( method_exists( $api, 'connect' ) ) {
+						$api->connect();
+					}
+					
+					// Get labels for audience and segment (for abstraction).
+					$newsletter_data['audienceLabel'] = method_exists( $api, 'get_audience_label' ) ? $api->get_audience_label() : __( 'Audience', 'newsletter-glue' );
+					$newsletter_data['segmentLabel'] = method_exists( $api, 'get_segment_label' ) ? $api->get_segment_label() : __( 'Segment', 'newsletter-glue' );
+				} else {
+					// Default labels if no app is connected.
+					$newsletter_data['audienceLabel'] = __( 'Audience', 'newsletter-glue' );
+					$newsletter_data['segmentLabel'] = __( 'Segment', 'newsletter-glue' );
 				}
+			} else {
+				// Default labels if no post ID.
+				$newsletter_data['audienceLabel'] = __( 'Audience', 'newsletter-glue' );
+				$newsletter_data['segmentLabel'] = __( 'Segment', 'newsletter-glue' );
 			}
 
 			wp_localize_script( 'ngl-confirm-send-js', 'newsletterglueConfirm', $newsletter_data );
