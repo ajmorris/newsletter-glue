@@ -1,6 +1,6 @@
 <?php
 /**
- * Onboarding Modal for wp_mail().
+ * wp_mail() Settings.
  */
 
 // Exit if accessed directly.
@@ -21,11 +21,12 @@ $role_options = array();
 
 if ( ! empty( $roles ) ) {
 	foreach ( $roles as $role_key => $role_data ) {
-		$label                  = isset( $role_data['name'] ) ? $role_data['name'] : $role_key;
+		$label                    = isset( $role_data['name'] ) ? $role_data['name'] : $role_key;
 		$role_options[ $role_key ] = $label;
 	}
 }
 
+// Global defaults.
 $saved_audiences      = newsletterglue_get_option( 'audiences', $app );
 $saved_excluded_roles = newsletterglue_get_option( 'excluded_roles', $app );
 
@@ -37,6 +38,7 @@ if ( ! is_array( $saved_excluded_roles ) ) {
 	$saved_excluded_roles = array();
 }
 
+// Default excluded roles from the integration class.
 $default_excluded = array();
 if ( isset( $api ) && is_object( $api ) && method_exists( $api, 'get_default_excluded_roles' ) ) {
 	$default_excluded = $api->get_default_excluded_roles();
@@ -44,22 +46,11 @@ if ( isset( $api ) && is_object( $api ) && method_exists( $api, 'get_default_exc
 
 ?>
 
-<div class="ngl-boarding alt ngl-mb-wp-mail is-hidden" data-screen="4">
+<div class="ngl-metabox-flex">
 
-	<div class="ngl-boarding-logo">
-		<div class="ngl-logo"><img src="<?php echo esc_url( NGL_PLUGIN_URL . '/assets/images/top-bar-logo.svg' ); ?>" alt="" /></div>
-	</div>
-
-	<div class="ngl-boarding-step"><?php esc_html_e( 'Step 2 of 3', 'newsletter-glue' ); ?></div>
-
-	<h3 style="max-width:100%;">
-		<?php esc_html_e( 'Now, let’s select your default audience.', 'newsletter-glue' ); ?>
-		<span><?php esc_html_e( 'You can always change this later on in the settings.', 'newsletter-glue' ); ?></span>
-	</h3>
-
-	<div class="ngl-settings ngl-metabox-flex">
+	<div class="ngl-metabox-flex">
 		<div class="ngl-metabox-header">
-			<?php esc_html_e( 'Audience roles', 'newsletter-glue' ); ?>
+			<label for="ngl_audiences"><?php esc_html_e( 'Audience roles', 'newsletter-glue' ); ?></label>
 			<?php $api->input_verification_info(); ?>
 		</div>
 		<div class="ngl-field">
@@ -79,7 +70,7 @@ if ( isset( $api ) && is_object( $api ) && method_exists( $api, 'get_default_exc
 		</div>
 	</div>
 
-	<div class="ngl-settings ngl-metabox-flex ngl-metabox-segment">
+	<div class="ngl-metabox-flex ngl-metabox-segment">
 		<div class="ngl-metabox-header">
 			<label for="ngl_excluded_roles"><?php esc_html_e( 'Excluded roles', 'newsletter-glue' ); ?></label>
 			<?php $api->input_verification_info(); ?>
@@ -94,7 +85,7 @@ if ( isset( $api ) && is_object( $api ) && method_exists( $api, 'get_default_exc
 						'id'       => 'ngl_excluded_roles',
 						'legacy'   => true,
 						'multiple' => true,
-						'helper'   => __( 'Users with these roles will never receive newsletters.', 'newsletter-glue' ),
+						'helper'   => __( 'Users with these roles will never receive newsletters (e.g. unsubscribed or bounced).', 'newsletter-glue' ),
 						'options'  => $role_options,
 						'default'  => $excluded_default,
 						'class'    => 'ngl-ajax',
@@ -104,17 +95,6 @@ if ( isset( $api ) && is_object( $api ) && method_exists( $api, 'get_default_exc
 		</div>
 	</div>
 
-	<div class="ngl-boarding-next disabled">
-		<span class="material-icons">arrow_forward</span>
-		<span class="ngl-boarding-next-text"><?php esc_html_e( 'next', 'newsletter-glue' ); ?></span>
-	</div>
-	<div class="ngl-boarding-prev">
-		<span class="material-icons">arrow_back</span>
-		<span class="ngl-boarding-prev-text"><?php esc_html_e( 'prev', 'newsletter-glue' ); ?></span>
-	</div>
-
 </div>
-
-<?php $api->load_last_onboarding_screen(); ?>
 
 

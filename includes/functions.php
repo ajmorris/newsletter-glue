@@ -110,7 +110,7 @@ function newsletterglue_get_supported_apps() {
 	$apps = array(
 		'activecampaign'	=> __( 'ActiveCampaign', 'newsletter-glue' ),
 		'campaignmonitor'	=> __( 'Campaign Monitor', 'newsletter-glue' ),
-		'wp-mail'           => __( 'wp_mail()', 'newsletter-glue' ),
+		'wpmail'            => __( 'wp_mail()', 'newsletter-glue' ),
 		'getresponse'		=> __( 'GetResponse', 'newsletter-glue' ),
 		'mailchimp'			=> __( 'Mailchimp', 'newsletter-glue' ),
 		'mailerlite'		=> __( 'MailerLite', 'newsletter-glue' ),

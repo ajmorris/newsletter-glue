@@ -20,10 +20,23 @@ function newsletterglue_settings_page() {
 	// Load into memory.
 	if ( $app ) {
 
-		include_once newsletterglue_get_path( $app ) . '/init.php';
+		$init_path = newsletterglue_get_path( $app ) . '/init.php';
 
-		$classname 	= 'NGL_' . ucfirst( $app );
-		$api		= new $classname();
+		if ( file_exists( $init_path ) ) {
+			include_once $init_path;
+
+			$classname = 'NGL_' . ucfirst( $app );
+
+			if ( class_exists( $classname ) ) {
+				$api = new $classname();
+			}
+		}
+
+		// Fallback to core integration if init file or class is missing.
+		if ( ! isset( $api ) ) {
+			include_once NGL_PLUGIN_DIR . 'includes/integrations/core/init.php';
+			$api = new NGL_Integration_Core();
+		}
 
 		if ( method_exists( $api, 'connect' ) ) {
 			$api->connect();

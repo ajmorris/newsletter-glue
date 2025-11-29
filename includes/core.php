@@ -609,9 +609,18 @@ function newsletterglue_default_connection() {
 		return false;
 	}
 
-	$apis = array_keys( $apis );
+	$slugs = array_keys( $apis );
 
-	return $apis[0];
+	// Return the first integration that actually exists on disk.
+	foreach ( $slugs as $slug ) {
+		$init_path = newsletterglue_get_path( $slug ) . '/init.php';
+
+		if ( file_exists( $init_path ) ) {
+			return $slug;
+		}
+	}
+
+	return false;
 }
 
 /**

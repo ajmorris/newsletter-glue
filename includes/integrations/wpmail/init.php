@@ -15,21 +15,21 @@ if ( ! class_exists( 'NGL_Abstract_Integration', false ) ) {
 /**
  * Main Class.
  */
-class NGL_Wp_Mail extends NGL_Abstract_Integration {
+class NGL_Wpmail extends NGL_Abstract_Integration {
 
 	/**
 	 * App slug used internally and for folder name.
 	 *
 	 * @var string
 	 */
-	public $app = 'wp-mail';
+	public $app = 'wpmail';
 
 	/**
 	 * Constructor.
 	 */
 	public function __construct() {
 		// For consistency with other integrations, allow HTML content filters.
-		add_filter( 'newsltterglue_wp-mail_html_content', array( $this, 'html_content' ), 10, 2 );
+		add_filter( 'newsltterglue_wpmail_html_content', array( $this, 'html_content' ), 10, 2 );
 	}
 
 	/**
@@ -41,8 +41,37 @@ class NGL_Wp_Mail extends NGL_Abstract_Integration {
 	 * @param array $integrations Existing integrations.
 	 */
 	public function get_connect_settings( $integrations = array() ) {
-		// Intentionally left mostly empty – wp_mail() has no remote API keys.
-		// We could surface informational text via a helper/filter if desired.
+		// wp_mail() has no remote API keys. Show brief info only.
+		?>
+		<p class="description">
+			<?php esc_html_e( 'This connection uses WordPress\'s built-in wp_mail(). No API key is required – click Connect to start sending.', 'newsletter-glue' ); ?>
+		</p>
+		<?php
+	}
+
+	/**
+	 * Add Integration.
+	 *
+	 * For wp_mail(), there are no credentials to validate. Mark the
+	 * integration as connected immediately.
+	 *
+	 * @return array
+	 */
+	public function add_integration() {
+		$integrations = get_option( 'newsletterglue_integrations' );
+
+		if ( ! is_array( $integrations ) ) {
+			$integrations = array();
+		}
+
+		if ( ! isset( $integrations[ $this->app ] ) ) {
+			$integrations[ $this->app ] = array();
+			update_option( 'newsletterglue_integrations', $integrations );
+		}
+
+		return array(
+			'response' => 'successful',
+		);
 	}
 
 	/**
@@ -154,7 +183,7 @@ class NGL_Wp_Mail extends NGL_Abstract_Integration {
 		 *
 		 * @param array $defaults Default excluded roles.
 		 */
-		return apply_filters( 'newsletterglue_wp_mail_default_excluded_roles', $defaults );
+		return apply_filters( 'newsletterglue_wpmail_default_excluded_roles', $defaults );
 	}
 
 	/**
@@ -177,7 +206,7 @@ class NGL_Wp_Mail extends NGL_Abstract_Integration {
 	 * @return array
 	 */
 	public function get_form_defaults() {
-		$defaults            = array();
+		$defaults              = array();
 		$defaults['audiences'] = $this->get_audiences();
 
 		return $defaults;
@@ -366,10 +395,10 @@ class NGL_Wp_Mail extends NGL_Abstract_Integration {
 		do {
 			$query = new WP_User_Query(
 				array(
-					'number'  => $per_page,
-					'paged'   => $paged,
+					'number'   => $per_page,
+					'paged'    => $paged,
 					'role__in' => $included_roles,
-					'fields'  => array( 'ID', 'user_email', 'roles' ),
+					'fields'   => array( 'ID', 'user_email', 'roles' ),
 				)
 			);
 

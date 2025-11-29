@@ -24,7 +24,7 @@ if ( isset( $settings->audience ) ) {
 }
 
 if ( empty( $selected_roles ) && ! empty( $audiences ) ) {
-	$keys          = array_keys( $audiences );
+	$keys           = array_keys( $audiences );
 	$selected_roles = array( $keys[0] );
 }
 
@@ -55,7 +55,7 @@ if ( function_exists( 'wp_roles' ) ) {
 
 	if ( ! empty( $roles ) ) {
 		foreach ( $roles as $role_key => $role_data ) {
-			$label                  = isset( $role_data['name'] ) ? $role_data['name'] : $role_key;
+			$label                    = isset( $role_data['name'] ) ? $role_data['name'] : $role_key;
 			$role_options[ $role_key ] = $label;
 		}
 	}
