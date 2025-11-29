@@ -111,6 +111,7 @@ function newsletterglue_get_supported_apps() {
 		'activecampaign'	=> __( 'ActiveCampaign', 'newsletter-glue' ),
 		'campaignmonitor'	=> __( 'Campaign Monitor', 'newsletter-glue' ),
 		'getresponse'		=> __( 'GetResponse', 'newsletter-glue' ),
+		'kit'				=> __( 'Kit', 'newsletter-glue' ),
 		'mailchimp'			=> __( 'Mailchimp', 'newsletter-glue' ),
 		'mailerlite'		=> __( 'MailerLite', 'newsletter-glue' ),
 		'sendinblue'		=> __( 'Sendinblue', 'newsletter-glue' ),
