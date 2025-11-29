@@ -135,16 +135,8 @@ function newsletterglue_is_post_scheduled( $post_id ) {
  * Returns true if free version is being used.
  */
 function newsletterglue_is_free_version() {
-
-	$plugin_data = get_plugin_data( NGL_PLUGIN_FILE );
-
-	if ( isset( $plugin_data[ 'Name' ] ) ) {
-		if ( stristr( $plugin_data[ 'Name' ], 'PRO' ) ) {
-			return false;
-		}
-	}
-
-	return true;
+	// Pro version restrictions removed - all features are now available
+	return false;
 }
 
 /**

@@ -36,11 +36,13 @@ class NGL_Kit_API {
 
 		$url = $this->api_url . ltrim( $endpoint, '/' );
 
+		// Kit API v4 authentication - uses X-Kit-Api-Key header
+		// Based on Kit API documentation: https://developers.kit.com/api-reference/broadcasts/create-a-broadcast
 		$args = array(
 			'method'  => $method,
 			'timeout' => self::TIMEOUT,
 			'headers' => array(
-				'Authorization' => 'Bearer ' . $this->api_key,
+				'X-Kit-Api-Key' => $this->api_key,
 				'Content-Type'  => 'application/json',
 				'Accept'        => 'application/json',
 			),
@@ -50,12 +52,25 @@ class NGL_Kit_API {
 			$args['body'] = json_encode( $body );
 		}
 
+		// Debug: Log request details
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( 'NGL_Kit_API Request: ' . $method . ' ' . $url );
+			error_log( 'NGL_Kit_API Headers: ' . print_r( $args['headers'], true ) );
+			if ( ! empty( $body ) ) {
+				error_log( 'NGL_Kit_API Body: ' . print_r( $body, true ) );
+			}
+		}
+
 		$response = wp_remote_request( $url, $args );
 
 		if ( is_wp_error( $response ) ) {
+			$error_message = $response->get_error_message();
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'NGL_Kit_API WP_Error: ' . $error_message );
+			}
 			return array(
 				'status'  => 'error',
-				'message' => $response->get_error_message(),
+				'message' => $error_message,
 			);
 		}
 
@@ -63,13 +78,30 @@ class NGL_Kit_API {
 		$response_body = wp_remote_retrieve_body( $response );
 		$data = json_decode( $response_body, true );
 
+		// Debug: Log response details
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( 'NGL_Kit_API Response Code: ' . $response_code );
+			error_log( 'NGL_Kit_API Response Body: ' . $response_body );
+			error_log( 'NGL_Kit_API Decoded Data: ' . print_r( $data, true ) );
+		}
+
 		if ( $response_code >= 200 && $response_code < 300 ) {
 			return $data;
 		}
 
+		// Extract error message from response
+		$error_message = __( 'API request failed', 'newsletter-glue' );
+		if ( isset( $data['errors'] ) && is_array( $data['errors'] ) && ! empty( $data['errors'] ) ) {
+			$error_message = is_array( $data['errors'][0] ) ? json_encode( $data['errors'][0] ) : $data['errors'][0];
+		} elseif ( isset( $data['message'] ) ) {
+			$error_message = $data['message'];
+		} elseif ( isset( $data['error'] ) ) {
+			$error_message = is_array( $data['error'] ) ? json_encode( $data['error'] ) : $data['error'];
+		}
+
 		return array(
 			'status'  => $response_code,
-			'message' => isset( $data['message'] ) ? $data['message'] : __( 'API request failed', 'newsletter-glue' ),
+			'message' => $error_message,
 			'data'    => $data,
 		);
 	}
@@ -80,7 +112,14 @@ class NGL_Kit_API {
 	 * @return array Account data
 	 */
 	public function get_account() {
-		return $this->request( 'account' );
+		// Kit API v4 - validate API key by making a simple request
+		// We'll use /forms endpoint as it's lightweight and validates the key
+		// If that doesn't work, we can try other endpoints
+		$result = $this->request( 'forms' );
+		
+		// If forms endpoint works, the API key is valid
+		// We don't need the actual account data, just validation
+		return $result;
 	}
 
 	/**

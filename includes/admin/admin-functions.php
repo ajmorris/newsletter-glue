@@ -509,10 +509,6 @@ function newsletterglue_get_review_button_html( $version = '' ) {
 
 	return;
 
-	if ( ! newsletterglue_is_free_version() ) {
-		return;
-	}
-
 	$eligible_time = newsletterglue_is_review_eligible();
 	$opacity = 1.0;
 

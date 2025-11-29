@@ -202,10 +202,8 @@ class NGL_Upgrade {
 	 * Allow connection edit.
 	 */
 	public function allow_connection_edit( $allowed, $app ) {
-		if ( $app != 'mailchimp' ) {
-			$allowed = false;
-		}
-		return $allowed;
+		// All ESPs are now available - no restrictions
+		return true;
 	}
 
 	/**

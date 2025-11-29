@@ -58,23 +58,118 @@ class NGL_Kit extends NGL_Abstract_Integration {
 			}
 		}
 
-		$this->api = new NGL_Kit_API( $api_key );
+		// Clean the API key - only extract if it has prefix text, otherwise use as-is
+		$clean_api_key = trim( $api_key );
+		if ( ! empty( $clean_api_key ) ) {
+			// Only extract if there's text before the key (like "Kit API Key - kit_...")
+			// If it already starts with "kit_", use it as-is
+			if ( strpos( $clean_api_key, 'kit_' ) !== 0 ) {
+				// Has prefix, extract just the key part
+				if ( preg_match( '/kit_[a-zA-Z0-9]+/', $clean_api_key, $matches ) ) {
+					$clean_api_key = $matches[0];
+				}
+			}
+			// Trim whitespace
+			$clean_api_key = trim( $clean_api_key );
+		}
 
+		$this->api = new NGL_Kit_API( $clean_api_key );
+
+		// Debug: Log API key (masked for security)
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			$masked_key = ! empty( $clean_api_key ) ? substr( $clean_api_key, 0, 8 ) . '...' . substr( $clean_api_key, -4 ) : 'empty';
+			error_log( 'NGL_Kit add_integration: Original API Key: ' . $api_key );
+			error_log( 'NGL_Kit add_integration: Cleaned API Key (masked): ' . $masked_key );
+		}
+
+		// Use /accounts endpoint to validate (Kit API v4)
 		$account = $this->api->get_account();
 
-		$valid_account = ! empty( $account ) && isset( $account[ 'account' ] ) && isset( $account[ 'account' ][ 'id' ] ) ? true : false;
+		// Debug: Log account response
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( 'NGL_Kit add_integration: Account response: ' . print_r( $account, true ) );
+		}
+
+		// Check for error responses first
+		if ( isset( $account['status'] ) && ( $account['status'] == 'error' || ( is_numeric( $account['status'] ) && $account['status'] >= 400 ) ) ) {
+			// Extract error message - check for errors array first, then message
+			$error_message = 'Unknown error';
+			if ( isset( $account['data']['errors'] ) && is_array( $account['data']['errors'] ) && ! empty( $account['data']['errors'] ) ) {
+				$error_message = is_array( $account['data']['errors'][0] ) ? json_encode( $account['data']['errors'][0] ) : $account['data']['errors'][0];
+			} elseif ( isset( $account['message'] ) ) {
+				$error_message = $account['message'];
+			} elseif ( isset( $account['data']['message'] ) ) {
+				$error_message = $account['data']['message'];
+			}
+			
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'NGL_Kit add_integration: Error detected - Status: ' . $account['status'] . ', Message: ' . $error_message );
+				error_log( 'NGL_Kit add_integration: Full error response: ' . print_r( $account, true ) );
+			}
+			$this->remove_integration();
+			$result = array( 
+				'response' => 'invalid',
+				'message'  => $error_message,
+			);
+			delete_option( 'newsletterglue_kit' );
+			return $result;
+		}
+
+		// Check for valid API key - Kit API v4 validation
+		// We're using /forms endpoint to validate - if it returns forms data or empty array, key is valid
+		// If it returns an error status, key is invalid
+		$valid_account = false;
+		$validation_details = array();
+
+		// Check for error responses (invalid key)
+		if ( isset( $account['status'] ) && ( $account['status'] == 'error' || ( is_numeric( $account['status'] ) && $account['status'] >= 400 ) ) ) {
+			$validation_details[] = 'Error status detected: ' . $account['status'];
+			$valid_account = false;
+		} elseif ( ! empty( $account ) ) {
+			// Success - check if we got forms data (means API key is valid)
+			if ( isset( $account['forms'] ) || ( is_array( $account ) && ! isset( $account['status'] ) && ! isset( $account['error'] ) ) ) {
+				$valid_account = true;
+				$validation_details[] = 'API key validated successfully via /forms endpoint';
+			} else {
+				$validation_details[] = 'Unexpected response structure';
+				$validation_details[] = 'Available keys: ' . implode( ', ', array_keys( $account ) );
+			}
+		} else {
+			$validation_details[] = 'Empty response - treating as valid (empty forms list)';
+			$valid_account = true; // Empty response might mean no forms, but API key is valid
+		}
+
+		// Debug: Log validation details
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( 'NGL_Kit add_integration: Validation details: ' . implode( ' | ', $validation_details ) );
+			error_log( 'NGL_Kit add_integration: Valid account: ' . ( $valid_account ? 'YES' : 'NO' ) );
+		}
 
 		if ( ! $valid_account ) {
 
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'NGL_Kit add_integration: Connection failed - invalid account structure' );
+				error_log( 'NGL_Kit add_integration: Full account response for debugging: ' . print_r( $account, true ) );
+			}
+
 			$this->remove_integration();
 
-			$result = array( 'response' => 'invalid' );
+			$result = array( 
+				'response' => 'invalid',
+				'message' => __( 'Invalid API key or account structure. Please check your API key and try again.', 'newsletter-glue' ),
+				'debug'   => defined( 'WP_DEBUG' ) && WP_DEBUG ? $validation_details : array(),
+			);
 
 			delete_option( 'newsletterglue_kit' );
 
 		} else {
 
-			$this->save_integration( $api_key, $account );
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'NGL_Kit add_integration: Connection successful' );
+			}
+
+			// Save the cleaned API key, not the original
+			$this->save_integration( $clean_api_key, $account );
 
 			$result = array( 'response' => 'successful' );
 

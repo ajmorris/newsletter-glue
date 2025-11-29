@@ -10,7 +10,7 @@ $url = NGL_PLUGIN_URL . 'assets/images/iconset/';
 
 ?>
 
-<div class="ngl-cards <?php if ( newsletterglue_is_free_version() ) echo 'ngl-cards-free'; ?>">
+		<div class="ngl-cards">
 
 	<div class="ngl-card">
 
@@ -18,15 +18,17 @@ $url = NGL_PLUGIN_URL . 'assets/images/iconset/';
 		<div class="ngl-card-add ngl-card-base">
 
 			<div class="ngl-header"><?php esc_html_e( 'Add new connection', 'newsletter-glue' ); ?></div>
-			<?php
-				newsletterglue_select_field( array(
-					'id' 			=> 'ngl_app',
-					'class'			=> 'ngl-app',
-					'options'		=> newsletterglue_get_supported_apps(),
-					'placeholder' 	=> esc_html__( 'Select email software...', 'newsletter-glue' ),
-					'has_icons'		=> true,
-				) );
-			?>
+			<div class="ngl-fields">
+				<?php
+					newsletterglue_select_field( array(
+						'id' 			=> 'ngl_app',
+						'class'			=> 'ngl-app',
+						'options'		=> newsletterglue_get_supported_apps(),
+						'placeholder' 	=> esc_html__( 'Select email software...', 'newsletter-glue' ),
+						'has_icons'		=> true,
+					) );
+				?>
+			</div>
 			<div class="ngl-card-link-end">
 				<a href="#" class="ui basic noborder button ngl-request-modal"><i class="bullhorn icon"></i><?php esc_html_e( 'Request new connection', 'newsletter-glue' ); ?></a>
 			</div>
@@ -36,7 +38,7 @@ $url = NGL_PLUGIN_URL . 'assets/images/iconset/';
 		<?php foreach( newsletterglue_get_supported_apps() as $app => $value ) : ?>
 
 			<?php if ( apply_filters( 'newsletterglue_allow_connection_edit', true, $app ) ) { ?>
-			<div class="ngl-card-add2 ngl-card-<?php echo esc_attr( $app ); ?> <?php if ( ( $app != 'mailchimp' && newsletterglue_is_free_version() ) || ( ! newsletterglue_is_free_version() ) || ( $app == 'mailchimp' && newsletterglue_default_connection() != 'mailchimp' && newsletterglue_default_connection() ) || ( newsletterglue_default_connection() == 'mailchimp' && newsletterglue_is_free_version() ) ) echo 'ngl-hidden'; ?>" data-app="<?php echo esc_attr( $app ); ?>">
+			<div class="ngl-card-add2 ngl-card-<?php echo esc_attr( $app ); ?> ngl-hidden" data-app="<?php echo esc_attr( $app ); ?>">
 
 				<?php if ( ! apply_filters( 'newsletterglue_allow_connection_edit', true, $app ) ) { ?>
 				<div class="ngl-card-link-start">
@@ -139,24 +141,5 @@ $url = NGL_PLUGIN_URL . 'assets/images/iconset/';
 
 	</div>
 
-	<?php if ( ! newsletterglue_is_onboarding_page() ) : ?>
-	<div class="ngl-card-upgrade <?php if ( newsletterglue_is_free_version() ) echo 'ngl-is-free'; ?>" style="display: <?php if ( newsletterglue_is_free_version() ) { echo 'block'; } else { echo 'none'; } ?>">
-		<h3>Want more integrations?</h3>
-		<div class="ngl-upgrade-lists">
-			<div class="ngl-upgrade-list">
-				<div class="ngl-upgrade-item"><span style="background:#356AE6;"><img src="<?php echo $url; ?>activecampaign.png" alt="" style="width: 14px;height: 21px;" /></span>ActiveCampaign</div>
-				<div class="ngl-upgrade-item"><span style="background:#7856FF;"><img src="<?php echo $url; ?>campaignmonitor.png" alt="" style="width: 21px;height: 14px;" /></span>Campaign Monitor</div>
-				<div class="ngl-upgrade-item"><span style="background:#00A1ED;"><img src="<?php echo $url; ?>getresponse.png" alt="" style="width: 22px;height: 14px;" /></span>GetResponse</div>
-			</div>
-			<div class="ngl-upgrade-list">
-				<div class="ngl-upgrade-item"><span style="background:#21C16C;"><img src="<?php echo $url; ?>mailerlite.png" alt="" style="width: 20px;height: 16px;" /></span>MailerLite</div>
-				<div class="ngl-upgrade-item"><span style="background:#0092FF;"><img src="<?php echo $url; ?>sendinblue.png" alt="" style="width: 18px;height: 21px;" /></span>Sendinblue</div>
-				<div class="ngl-upgrade-item"><span style="background: transparent;"><img src="<?php echo $url; ?>sendy.png" alt="" /></span>Sendy</div>
-			</div>
-		</div>
-		<p>Upgrade to Newsletter Glue Pro today. Free plugin users get 15% off your first year.</p>
-		<div class="ngl-upgrade-cta"><a href="https://newsletterglue.com/upgrade53jyt4/" target="_blank">Learn more <i class="arrow right icon"></i></a></div>
-	</div>
-	<?php endif; ?>
 
 </div>
