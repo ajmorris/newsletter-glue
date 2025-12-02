@@ -16,6 +16,8 @@ abstract class NGL_Abstract_Block {
 
 	public $is_pro = false;
 
+	public $asset_id = '';
+
 	/**
 	 * Load block settings.
 	 */
